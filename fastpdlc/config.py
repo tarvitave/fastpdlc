@@ -44,6 +44,10 @@ class Config(BaseModel):
 
     product_dir: str = "product"
     output: str = "build/product.generated.json"
+    # Bundle key ordering. True (default) sorts keys for stable diffs; False keeps
+    # insertion order — set it when a plugin's bundle_transformer builds a bespoke,
+    # ordered bundle you need to reproduce byte-for-byte.
+    sort_keys: bool = True
     types: list[ArtifactType]
 
     def type_by_name(self, name: str) -> ArtifactType | None:

@@ -137,4 +137,4 @@ jobs:
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+LGPL-3.0-or-later (copyleft, but you can import it as a library without your project inheriting the licence). See [LICENSE](LICENSE).

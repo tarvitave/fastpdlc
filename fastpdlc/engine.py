@@ -66,13 +66,13 @@ def _transformed_bundle(config: Config, root, registry) -> dict:
     return bundle
 
 
-def _dump(bundle: dict) -> str:
-    return json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+def _dump(bundle: dict, sort_keys: bool = True) -> str:
+    return json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=sort_keys) + "\n"
 
 
 def render_bundle(config: Config, root: str | pathlib.Path = ".", registry=None) -> str:
     """The exact JSON bundle string expected on disk (stable ordering + trailing NL)."""
-    return _dump(_transformed_bundle(config, root, registry))
+    return _dump(_transformed_bundle(config, root, registry), config.sort_keys)
 
 
 def build(config: Config, root: str | pathlib.Path = ".", registry=None) -> list[pathlib.Path]:
@@ -80,7 +80,7 @@ def build(config: Config, root: str | pathlib.Path = ".", registry=None) -> list
     bundle = _transformed_bundle(config, root, registry)
     out = pathlib.Path(root) / config.output
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_dump(bundle), encoding="utf-8", newline="\n")
+    out.write_text(_dump(bundle, config.sort_keys), encoding="utf-8", newline="\n")
     written = [out]
     if registry:
         for rel, renderer in registry.extra_outputs:
