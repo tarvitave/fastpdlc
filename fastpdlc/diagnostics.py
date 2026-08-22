@@ -32,9 +32,10 @@ CODES: dict[str, str] = {
 
 
 def register(code: str, message: str) -> None:
-    """Register a project-specific diagnostic code (idempotent if identical)."""
-    if code in CODES and CODES[code] != message:
-        raise ValueError(f"diagnostic code {code} already registered with a different message")
+    """Register (or re-document) a diagnostic code. A project owns its own code
+    numbers — re-registering an existing code overrides its documentation, so a
+    project that reuses the core numbers with its own meanings (or ships its own
+    range) just works."""
     CODES[code] = message
 
 
@@ -46,10 +47,6 @@ class Diagnostic:
     message: str
     where: str = ""
     severity: str = "error"  # "error" (gating) or "warning" (advisory)
-
-    def __post_init__(self) -> None:
-        if self.code not in CODES:
-            raise ValueError(f"unregistered diagnostic code {self.code!r}")
 
     def render(self) -> str:
         loc = f"{self.where}: " if self.where else ""
