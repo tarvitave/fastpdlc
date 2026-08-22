@@ -118,7 +118,21 @@ def register(reg):
 fastpdlc -p product_hooks.py validate
 ```
 
+## Start a new repo in one command
+
+Scaffold a ready-to-go product-as-code repo (config, example artifacts, and the CI
+gate) with the [copier](https://copier.readthedocs.io) template:
+
+```bash
+pipx run copier copy --trust gh:tarvitave/fastpdlc my-product-repo
+```
+
+`--trust` lets the template run `fastpdlc build` once so the new repo is valid on its
+first commit.
+
 ## CI
+
+Use the reusable Action — it installs FastPDLC and runs the gate:
 
 ```yaml
 # .github/workflows/product.yml
@@ -129,11 +143,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: tarvitave/fastpdlc@v0.1.0
+        with:
+          config: product.config.yaml     # optional (default)
+          plugin: product_hooks.py         # optional project checks
+```
+
+<details><summary>Prefer plain pip?</summary>
+
+```yaml
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install fastpdlc
       - run: fastpdlc validate
 ```
+</details>
+
+## Used in production
+
+FastPDLC is the product-as-code engine of the **pharthing / KibiPay** payments
+platform (39 features, a concept catalogue, and a ~283 KB render bundle). pharthing's
+CI runs `fastpdlc validate` as its sole gate via a plugin that adds domain checks — a
+byte-identical parity test proves nothing was lost in the extraction. That's the
+plugin system above, doing real work.
+
+## Releasing
+
+Publishing to PyPI is automated via GitHub Releases + Trusted Publishing — see
+[RELEASING.md](RELEASING.md).
 
 ## License
 

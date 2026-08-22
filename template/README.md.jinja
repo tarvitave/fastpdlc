@@ -1,0 +1,24 @@
+# {{ project_name }} — product as code
+
+Your product is defined as a typed, validated graph under [`{{ product_dir }}/`]({{ product_dir }}/),
+and generated into [`{{ output_bundle }}`]({{ output_bundle }}) by
+[FastPDLC](https://github.com/tarvitave/fastpdlc).
+
+## Workflow
+
+```bash
+pip install fastpdlc=={{ fastpdlc_version }}
+
+fastpdlc validate      # schema + references + staleness — this is the CI gate
+fastpdlc build         # regenerate {{ output_bundle }} after editing an artifact
+```
+
+Commit `{{ output_bundle }}` alongside your edits; the `product-validate` workflow
+fails any PR where it has drifted out of sync with `{{ product_dir }}/`.
+
+## Adding artifacts
+
+Each file under `{{ product_dir }}/<type>/` is one record. Its `id` must start with
+the type's prefix and match the filename (e.g. `{{ product_dir }}/terms/TERM-payment.md`
+has `id: TERM-payment`). Reference fields must resolve to a real id — see
+[`product.config.yaml`](product.config.yaml) for the types this repo defines.

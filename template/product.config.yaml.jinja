@@ -1,0 +1,22 @@
+# Product-as-code config for {{ project_name }}. Every artifact under {{ product_dir }}/
+# is a typed, id'd, cross-referenced record — FastPDLC validates the whole graph and
+# regenerates {{ output_bundle }} from it. Edit the types below to model your domain.
+product_dir: {{ product_dir }}
+output: {{ output_bundle }}
+types:
+  - name: terms
+    dir: terms
+    id_prefix: "TERM-"          # id must be TERM-<slug> and match the filename
+    required: [id, term, definition]
+    fields: [term, definition, see_also]
+    references:
+      - field: see_also         # every see_also must resolve to another term
+        to: terms
+  - name: rules
+    dir: rules
+    id_prefix: "BR-"
+    required: [id, title, statement]
+    fields: [title, statement, applies_to]
+    references:
+      - field: applies_to       # a rule may point at the terms it governs
+        to: terms

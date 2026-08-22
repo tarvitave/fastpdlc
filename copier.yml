@@ -1,0 +1,34 @@
+# Copier template: scaffold a product-as-code repo wired to FastPDLC in one command.
+#
+#   pipx run copier copy --trust gh:tarvitave/fastpdlc my-product-repo
+#
+# `--trust` lets the post-scaffold task run `fastpdlc build`, so the new repo starts
+# with a committed, in-sync bundle that its CI gate accepts on the first push. Without
+# it, run `pip install fastpdlc && fastpdlc build` yourself before the first commit.
+_min_copier_version: "9.0.0"
+_subdirectory: "template"      # the library lives at the repo root; the template is here
+
+project_name:
+  type: str
+  help: "Human name of your product (shown in the scaffolded README)."
+  default: "My Product"
+
+product_dir:
+  type: str
+  help: "Directory that holds your product/ artifacts."
+  default: "product"
+
+output_bundle:
+  type: str
+  help: "Path for the generated render bundle (kept in sync by the CI gate)."
+  default: "build/product.generated.json"
+
+fastpdlc_version:
+  type: str
+  help: "FastPDLC version to pin in CI and install for the post-scaffold build."
+  default: "0.1.0"
+
+_tasks:
+  # Make the freshly scaffolded repo immediately valid. Skipped unless you pass --trust.
+  - "python -m pip install --quiet 'fastpdlc=={{ fastpdlc_version }}' || pip install --quiet 'fastpdlc=={{ fastpdlc_version }}'"
+  - "fastpdlc build"
