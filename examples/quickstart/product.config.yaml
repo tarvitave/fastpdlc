@@ -1,0 +1,17 @@
+# A minimal product-as-code config. Two typed artifacts: a glossary and a rulebook.
+product_dir: product
+output: build/product.generated.json
+types:
+  - name: terms
+    dir: terms
+    id_prefix: "TERM-"          # id must be TERM-<slug> and match the filename
+    required: [id, term, definition]
+    fields: [term, definition, see_also]
+    references:
+      - field: see_also         # every see_also must resolve to another term
+        to: terms
+  - name: rules
+    dir: rules
+    id_prefix: "BR-"
+    required: [id, title, statement]
+    fields: [title, statement]
