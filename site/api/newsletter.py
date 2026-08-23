@@ -249,6 +249,43 @@ def email_html(subject: str, body_md: str, unsubscribe_url: str) -> str:
 </body></html>"""
 
 
+def send_test(issue_id: int, to: str) -> dict:
+    """Send one issue to a single address, touching nothing else.
+
+    Deliberately separate from send(): it does not read the subscriber list, does
+    not mark the issue sent, and does not write the archive. Use it to prove
+    deliverability and rendering before arming unattended sending.
+    """
+    with cursor() as conn:
+        row = conn.execute("SELECT * FROM newsletters WHERE id = ?", (issue_id,)).fetchone()
+    if not row:
+        raise ValueError(f"no newsletter {issue_id}")
+    if not POSTMARK_TOKEN:
+        raise RuntimeError("POSTMARK_TOKEN is not configured")
+
+    payload = {
+        "From": FROM_EMAIL,
+        "To": to,
+        "Subject": f"[test] {row['subject']}",
+        "HtmlBody": email_html(row["subject"], row["body_md"],
+                               f"{SITE}/api/unsubscribe?e={to}"),
+        "TextBody": row["body_md"],
+        "MessageStream": "broadcast",
+    }
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(
+            "https://api.postmarkapp.com/email",
+            headers={"X-Postmark-Server-Token": POSTMARK_TOKEN,
+                     "Accept": "application/json"},
+            json=payload,
+        )
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {"raw": resp.text[:300]}
+    return {"http": resp.status_code, "from": FROM_EMAIL, "to": to, "response": data}
+
+
 def _slug(subject: str) -> str:
     base = re.sub(r"[^a-z0-9]+", "-", subject.lower()).strip("-")[:60] or "issue"
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
