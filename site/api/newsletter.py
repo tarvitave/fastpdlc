@@ -34,7 +34,44 @@ SITE = "https://fastpdlc.com"
 PUBLIC = pathlib.Path(os.getenv("PUBLIC_DIR", "/srv/public"))
 BUNDLE = pathlib.Path(os.getenv("BLOG_BUNDLE", "/srv/content/build/blog.generated.json"))
 
-SYSTEM = """\
+# ── the CLI surface, generated from argparse rather than retyped ─────────────
+# site/tools/gen_cli_surface.py writes cli_surface.json from the real parser, and a
+# test fails when the committed manifest drifts. Both the prompt below and the guard
+# in generate() read from here, so adding a subcommand cannot leave the newsletter
+# rejecting true statements about our own tool.
+_SURFACE_PATH = pathlib.Path(__file__).with_name("cli_surface.json")
+
+
+def _load_surface() -> dict:
+    try:
+        return json.loads(_SURFACE_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        # Degrade to the core two rather than block generation entirely; a missing
+        # manifest should cost accuracy, not availability.
+        return {"global_flags": ["--config", "--plugin", "--root"],
+                "subcommands": {"build": {"flags": [], "help": ""},
+                                "validate": {"flags": [], "help": ""}}}
+
+
+SURFACE = _load_surface()
+CLI_VERBS = set(SURFACE["subcommands"])
+CLI_FLAGS = set(SURFACE.get("global_flags", [])) | {
+    f for meta in SURFACE["subcommands"].values() for f in meta.get("flags", [])
+}
+
+
+def _cli_surface_block() -> str:
+    lines = []
+    for name, meta in sorted(SURFACE["subcommands"].items()):
+        help_text = meta.get("help", "")
+        lines.append(f"      fastpdlc {name:<10} {help_text}")
+        if meta.get("flags"):
+            lines.append(f"        flags: {', '.join(sorted(meta['flags']))}")
+    lines.append(f"      global flags: {', '.join(sorted(SURFACE.get('global_flags', [])))}")
+    return "\n".join(lines)
+
+
+SYSTEM = f"""\
 You write the FastPDLC newsletter.
 
 FastPDLC is a Python tool that turns product intent -- glossaries, business rules,
@@ -55,10 +92,7 @@ Rules:
 - Do not invent features, customers, metrics, or version numbers. If you are unsure
   whether something exists, write about the idea instead of the feature.
 - THE ENTIRE CLI SURFACE IS:
-      fastpdlc build          regenerate the committed JSON bundle
-      fastpdlc validate       schema + graph + staleness; non-zero exit gates CI
-      fastpdlc evidence       content-addressed audit record (-o/--output to a file)
-      flags: -c/--config, -C/--root, -p/--plugin, and -o/--output on evidence
+{_cli_surface_block()}
   There are no other subcommands and no other flags. Never write `--check`,
   `--strict`, `--fix`, `fastpdlc lint`, or anything else. Staleness is checked by
   `fastpdlc validate` -- it is not a separate command.
@@ -170,11 +204,11 @@ body: the newsletter in plain markdown, 250-400 words."""
     # notice that `fastpdlc build --check` is not a real command, and a reader who
     # copies it gets an argparse error and concludes the tool is broken.
     for verb in re.findall(r"fastpdlc\s+(?:-\w+\s+\S+\s+)*([a-z][a-z-]*)", body):
-        if verb not in {"build", "validate", "evidence"}:
+        if verb not in CLI_VERBS:
             raise ValueError(f"invented CLI subcommand: fastpdlc {verb}")
     for line in body.splitlines():
         for flag in re.findall(r"fastpdlc.*?(--[a-z-]+)", line):
-            if flag not in {"--config", "--root", "--plugin", "--output"}:
+            if flag not in CLI_FLAGS:
                 raise ValueError(f"invented CLI flag: {flag}")
 
     return subject, body

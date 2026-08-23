@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import pathlib
+
+import pytest
 import sys
 
 import yaml
@@ -244,3 +246,30 @@ def test_evidence_is_reproducible_apart_from_the_timestamp(tmp_path):
     first.pop("generated_at")
     second.pop("generated_at")
     assert evidence.render(first) == evidence.render(second)
+
+
+def test_cli_surface_manifest_is_current():
+    """site/api/cli_surface.json is generated from argparse and consumed by the
+    newsletter generator. If it drifts, the newsletter starts rejecting true
+    statements about our own CLI -- so gate it the way we gate everything else.
+
+    This is PAC-060 applied to our own tooling: regenerate with
+    `python site/tools/gen_cli_surface.py` and commit the result.
+    """
+    import importlib.util
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    gen = repo / "site" / "tools" / "gen_cli_surface.py"
+    committed = repo / "site" / "api" / "cli_surface.json"
+    if not gen.exists() or not committed.exists():
+        pytest.skip("site tooling not present")
+
+    spec = importlib.util.spec_from_file_location("gen_cli_surface", gen)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    expected = module.render(module.build_surface())
+    actual = committed.read_text(encoding="utf-8")
+    assert actual == expected, (
+        "cli_surface.json is stale -- run: python site/tools/gen_cli_surface.py"
+    )

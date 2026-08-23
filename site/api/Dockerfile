@@ -9,6 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY *.py ./
+COPY cli_surface.json ./
 
 # Runs unprivileged. /data must exist in the IMAGE and be owned by appuser:
 # Docker seeds an empty named volume from the image path, ownership included.
