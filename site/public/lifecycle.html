@@ -182,6 +182,17 @@
       <article class="tl">
         <div class="tl-time">04</div>
         <div>
+          <h3>The record is exportable</h3>
+          <p><code>fastpdlc evidence -o build/evidence.json</code> emits what was checked, when,
+            on which commit, and with what result &mdash; every artifact, the config and the
+            bundle carrying a SHA-256. An auditor verifies it by recomputing digests, not by
+            trusting the issuer. For a date in the past, check out that commit and run it again.</p>
+          <span class="tag ok">content-addressed</span>
+        </div>
+      </article>
+      <article class="tl">
+        <div class="tl-time">05</div>
+        <div>
           <h3>The findings are stable</h3>
           <p>Diagnostics carry codes that are never renumbered, so a control can be described
             once and matched on forever &mdash; by CI, by a dashboard, or by whoever is asking.</p>

@@ -2,6 +2,7 @@
 
     fastpdlc build                       # regenerate the JSON bundle
     fastpdlc validate                    # schema + graph + staleness (CI gate)
+    fastpdlc evidence -o build/ev.json   # content-addressed audit record
     fastpdlc -c product.config.yaml -p product_hooks.py validate
 
 Exit code is non-zero iff validation found errors — wire ``fastpdlc validate`` into CI.
@@ -9,9 +10,10 @@ Exit code is non-zero iff validation found errors — wire ``fastpdlc validate``
 from __future__ import annotations
 
 import argparse
+import pathlib
 import sys
 
-from . import engine
+from . import engine, evidence
 from .config import load_config
 from .plugin import load_plugin
 
@@ -24,6 +26,12 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build", help="regenerate the committed JSON bundle(s)")
     sub.add_parser("validate", help="schema + graph + staleness checks (CI gate)")
+    ev = sub.add_parser(
+        "evidence",
+        help="emit a content-addressed record of what was checked, when, and on what",
+    )
+    ev.add_argument("-o", "--output", default=None,
+                    help="write the record here instead of stdout")
     return p
 
 
@@ -36,6 +44,20 @@ def main(argv: list[str] | None = None) -> int:
         for path in engine.build(config, args.root, registry):
             print(f"wrote {path}")
         return 0
+
+    if args.cmd == "evidence":
+        record = evidence.build_record(config, args.root, registry)
+        text = evidence.render(record)
+        if args.output:
+            out = pathlib.Path(args.root) / args.output
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, encoding="utf-8", newline="\n")
+            print(f"wrote {out}")
+        else:
+            sys.stdout.write(text)
+        # Same gating semantics as validate: an evidence record of a failing run is
+        # still worth having, but CI must not go green because you asked for one.
+        return 1 if record["result"] == "fail" else 0
 
     report = engine.validate(config, args.root, registry)
     for w in report.warnings:

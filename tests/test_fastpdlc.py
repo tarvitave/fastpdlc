@@ -165,3 +165,82 @@ def test_dates_in_frontmatter_serialize_to_iso(tmp_path):
     bundle = json.loads((tmp_path / "build" / "out.json").read_text(encoding="utf-8"))
     assert bundle["posts"][0]["date"] == "2026-02-04"
     assert engine.validate(config, str(tmp_path)).ok
+
+
+def _tiny_project(tmp_path):
+    (tmp_path / "product" / "terms").mkdir(parents=True)
+    (tmp_path / "product" / "terms" / "TERM-payment.md").write_text(
+        "---\nid: TERM-payment\nterm: Payment\ndefinition: Moving money.\n---\nBody.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "product.config.yaml").write_text(
+        "product_dir: product\n"
+        "output: build/out.json\n"
+        "types:\n"
+        "  - name: terms\n"
+        "    dir: terms\n"
+        "    id_prefix: 'TERM-'\n"
+        "    required: [id, term, definition]\n"
+        "    fields: [term, definition]\n",
+        encoding="utf-8",
+    )
+    from fastpdlc.config import load_config
+    return load_config(str(tmp_path / "product.config.yaml"))
+
+
+def test_evidence_record_is_content_addressed(tmp_path):
+    """Every artifact and the bundle carry a digest, so a record can be verified by
+    recomputation rather than by trusting whoever produced it."""
+    import hashlib
+
+    from fastpdlc import engine, evidence
+
+    config = _tiny_project(tmp_path)
+    engine.build(config, str(tmp_path))
+    record = evidence.build_record(config, str(tmp_path))
+
+    assert record["schema"] == "fastpdlc-evidence/1"
+    assert record["result"] == "pass"
+    assert record["counts"] == {"terms": 1}
+
+    artifact = record["artifacts"]["terms"][0]
+    on_disk = (tmp_path / artifact["file"]).read_bytes()
+    assert artifact["sha256"] == hashlib.sha256(on_disk).hexdigest()
+
+    bundle_bytes = (tmp_path / "build" / "out.json").read_bytes()
+    assert record["bundle"]["sha256"] == hashlib.sha256(bundle_bytes).hexdigest()
+    assert record["bundle"]["matches_sources"] is True
+
+
+def test_evidence_reports_staleness_and_failure(tmp_path):
+    """A record of a failing run is still a valid record -- it just says so."""
+    from fastpdlc import engine, evidence
+
+    config = _tiny_project(tmp_path)
+    engine.build(config, str(tmp_path))
+
+    # edit a source without rebuilding: the classic drift
+    (tmp_path / "product" / "terms" / "TERM-payment.md").write_text(
+        "---\nid: TERM-payment\nterm: Payment\ndefinition: Changed.\n---\nBody.\n",
+        encoding="utf-8",
+    )
+    record = evidence.build_record(config, str(tmp_path))
+
+    assert record["result"] == "fail"
+    assert record["bundle"]["matches_sources"] is False
+    assert any(f["code"] == "PAC-060" for f in record["findings"])
+
+
+def test_evidence_is_reproducible_apart_from_the_timestamp(tmp_path):
+    """Two runs on one commit must agree; that is what makes historical evidence
+    a checkout away rather than a feature."""
+    from fastpdlc import engine, evidence
+
+    config = _tiny_project(tmp_path)
+    engine.build(config, str(tmp_path))
+
+    first = evidence.build_record(config, str(tmp_path))
+    second = evidence.build_record(config, str(tmp_path))
+    first.pop("generated_at")
+    second.pop("generated_at")
+    assert evidence.render(first) == evidence.render(second)

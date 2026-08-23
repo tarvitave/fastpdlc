@@ -57,7 +57,8 @@ Rules:
 - THE ENTIRE CLI SURFACE IS:
       fastpdlc build          regenerate the committed JSON bundle
       fastpdlc validate       schema + graph + staleness; non-zero exit gates CI
-      flags: -c/--config, -C/--root, -p/--plugin
+      fastpdlc evidence       content-addressed audit record (-o/--output to a file)
+      flags: -c/--config, -C/--root, -p/--plugin, and -o/--output on evidence
   There are no other subcommands and no other flags. Never write `--check`,
   `--strict`, `--fix`, `fastpdlc lint`, or anything else. Staleness is checked by
   `fastpdlc validate` -- it is not a separate command.
@@ -169,11 +170,11 @@ body: the newsletter in plain markdown, 250-400 words."""
     # notice that `fastpdlc build --check` is not a real command, and a reader who
     # copies it gets an argparse error and concludes the tool is broken.
     for verb in re.findall(r"fastpdlc\s+(?:-\w+\s+\S+\s+)*([a-z][a-z-]*)", body):
-        if verb not in {"build", "validate"}:
+        if verb not in {"build", "validate", "evidence"}:
             raise ValueError(f"invented CLI subcommand: fastpdlc {verb}")
     for line in body.splitlines():
         for flag in re.findall(r"fastpdlc.*?(--[a-z-]+)", line):
-            if flag not in {"--config", "--root", "--plugin"}:
+            if flag not in {"--config", "--root", "--plugin", "--output"}:
                 raise ValueError(f"invented CLI flag: {flag}")
 
     return subject, body

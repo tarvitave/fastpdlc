@@ -57,6 +57,22 @@ pip install fastpdlc
    fastpdlc validate    # schema + graph + staleness; non-zero exit on errors
    ```
 
+## Evidence
+
+`fastpdlc evidence` emits a content-addressed record of what was checked, when, on
+which commit, and with what result — for the audit conversation that starts *"prove
+your documented rules matched your implementation"*:
+
+```bash
+fastpdlc evidence -o build/evidence.json
+```
+
+Every artifact, the config and the bundle carry a SHA-256, so the record is verified
+by recomputing digests rather than by trusting whoever produced it. Historical
+evidence needs no special support: check out the commit and run it again — bundles
+are byte-stable, so the digests match. Exit code follows `validate`, so it gates CI
+and records it in one step.
+
 ## What `validate` enforces
 
 Every finding carries a stable `PAC-NNN` code (an API — CI and dashboards match on the
