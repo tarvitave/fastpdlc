@@ -37,6 +37,15 @@ That's it — no `PYPI_API_TOKEN`, no `twine` credentials.
    builds the sdist + wheel, and uploads to PyPI via OIDC.
 4. Verify: `pip install fastpdlc==X.Y.Z`.
 
+**Fallback if the release event doesn't fire the workflow** (GitHub occasionally
+doesn't trigger on `release`, e.g. after a delete/recreate): run it manually from
+`main`, which must already carry the target version in `pyproject.toml`:
+
+```bash
+gh workflow run publish.yml -f version=X.Y.Z
+gh run watch "$(gh run list --workflow=publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+```
+
 ## Versioning
 
 FastPDLC follows semver. Diagnostic **codes are API** — never renumber an existing
