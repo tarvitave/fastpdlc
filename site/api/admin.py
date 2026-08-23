@@ -89,7 +89,7 @@ def shell(title: str, body: str, tab: str = "") -> HTMLResponse:
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>{CSS}</style></head><body>
 <div class="top"><div class="wrap">
-  <a class="brand" href="/admin/">FASTPDLC</a>
+  <a class="brand" href="/admin/"><svg viewBox="0 0 40 40" width="22" height="22" style="vertical-align:-4px;margin-right:6px"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg>FASTPDLC</a>
   <nav>
     <a href="/admin/"{cls('home')}>Dashboard</a>
     <a href="/admin/analytics"{cls('analytics')}>Analytics</a>

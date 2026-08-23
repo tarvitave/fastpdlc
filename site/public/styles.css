@@ -158,19 +158,22 @@ h3 { font-size: clamp(1.25rem, 2.4vw, 1.6rem); letter-spacing: 0.3px; }
 }
 .nav-inner { display: flex; align-items: center; gap: 1.5rem; height: 76px; }
 
-.logo { position: relative; text-decoration: none; flex: none; }
-.logo-mark {
-  display: inline-block;
+/* A tick whose endpoints are graph nodes: a validated graph, in one glyph.
+   Replaces the wordmark-in-a-bubble, which was borrowed and said nothing. */
+.logo {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  text-decoration: none; flex: none;
+}
+.logo-glyph {
+  width: 34px; height: 34px; flex: none;
+  filter: drop-shadow(var(--sh-sm));
+}
+.logo-word {
   font-family: var(--display); font-size: 1.4rem; letter-spacing: 0.6px;
-  background: var(--ink); color: var(--paper);
-  padding: 0.34rem 0.7rem 0.28rem;
-  border-radius: var(--r); box-shadow: var(--sh-sm);
+  color: var(--ink);
 }
-.logo::after {          /* speech-bubble tail */
-  content: ''; position: absolute; left: 18px; bottom: -8px;
-  border-left: 9px solid var(--ink);
-  border-bottom: 10px solid transparent;
-}
+.logo:hover .logo-glyph { transform: translate(-1px, -1px); }
+.logo-glyph { transition: transform 0.1s ease; }
 
 .nav-links { display: flex; gap: 1.6rem; margin-left: auto; align-items: center; }
 .nav-links a {
@@ -499,8 +502,8 @@ pre .o { color: var(--orange); }
 .footer a { color: #c9c9c9; text-decoration: none; font-size: 0.95rem; }
 .footer a:hover { color: var(--yellow); }
 .footer-blurb { font-size: 0.95rem; max-width: 26rem; margin-top: 1rem; }
-.footer .logo-mark { background: var(--paper); color: var(--ink); }
-.footer .logo::after { border-left-color: var(--paper); }
+.footer .logo-word { color: var(--paper); }
+.footer .logo-glyph { filter: drop-shadow(2px 2px 0 rgba(255,255,255,0.35)); }
 .footer-base { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin-top: 3rem; padding-top: 1.5rem; border-top: 2px solid #333; font-size: 0.88rem; }
 
 /* ── motion / reveal ─────────────────────────────────────────────────────── */
