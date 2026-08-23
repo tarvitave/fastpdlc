@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastPDLC — Your product spec, compiled.</title>
+<meta name="description" content="FastPDLC turns your glossary, business rules and features into typed artifacts, validates them as a graph, compiles a JSON bundle, and fails CI when it drifts. Product-as-code for any project.">
+<link rel="canonical" href="https://fastpdlc.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fastpdlc.com/">
+<meta property="og:title" content="FastPDLC — Your product spec, compiled.">
+<meta property="og:description" content="Declare your product artifacts as code. FastPDLC validates the graph, compiles a JSON bundle, and fails CI when it drifts.">
+<meta name="twitter:card" content="summary">
+<!-- Social preview image: render public/og.html to public/og.png (see DEPLOY.md),
+     then uncomment these two lines and switch twitter:card to summary_large_image.
+<meta property="og:image" content="https://fastpdlc.com/og.png">
+<meta property="og:image:alt" content="FastPDLC — your product spec, compiled.">
+-->
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23191919'/><text x='50' y='72' font-family='Arial Narrow,Impact,sans-serif' font-size='62' font-weight='900' fill='%23fbcc00' text-anchor='middle'>F</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "FastPDLC",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "description": "Product-as-code as a validated graph. Declare typed product artifacts, validate the reference graph, compile a JSON bundle, and gate CI on drift.",
+  "url": "https://fastpdlc.com/",
+  "license": "https://www.gnu.org/licenses/lgpl-3.0.html",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+</head>
+<body>
+
+<!-- ══ nav ══════════════════════════════════════════════════════════════ -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+
+    <nav class="nav-links" id="navLinks">
+      <a href="#how">How it works</a>
+      <a href="#diagnostics">Diagnostics</a>
+      <a href="#plugins">Plugins</a>
+      <a href="#proof">Proof</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/tarvitave/fastpdlc">GitHub</a>
+      <a class="btn btn-primary nav-cta" href="#start">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ══ hero ═════════════════════════════════════════════════════════════ -->
+<section class="section hero">
+
+  <!-- diagnostic-code rail -->
+  <div class="rail" aria-hidden="true">
+    <div class="rail-track" id="railTrack">
+      <article class="chip" style="--c:#ff6b4a; --c2:#fff">
+        <span class="chip-code">PAC<br>001</span>
+        <code class="chip-line">missing required field 'definition'</code>
+        <span class="badge">Required</span>
+      </article>
+      <article class="chip" style="--c:#4a90e2; --c2:#fbcc00">
+        <span class="chip-code">PAC<br>010</span>
+        <code class="chip-line">id 'payment' must start with 'TERM-'</code>
+        <span class="badge">Prefix</span>
+      </article>
+      <article class="chip" style="--c:#00b67a; --c2:#fff">
+        <span class="chip-code">PAC<br>011</span>
+        <code class="chip-line">id must match its filename</code>
+        <span class="badge">Filename</span>
+      </article>
+      <article class="chip" style="--c:#b47cff; --c2:#fff">
+        <span class="chip-code">PAC<br>012</span>
+        <code class="chip-line">duplicate id 'BR-idempotent'</code>
+        <span class="badge">Duplicate</span>
+      </article>
+      <article class="chip" style="--c:#8b1538; --c2:#fbcc00">
+        <span class="chip-code">PAC<br>020</span>
+        <code class="chip-line">see_also 'TERM-leger' does not resolve</code>
+        <span class="badge">Reference</span>
+      </article>
+      <article class="chip" style="--c:#ff8fd0; --c2:#fff">
+        <span class="chip-code">PAC<br>030</span>
+        <code class="chip-line">status 'in-progres' not in allowed set</code>
+        <span class="badge">Enum</span>
+      </article>
+      <article class="chip" style="--c:#fbcc00; --c2:#191919">
+        <span class="chip-code">PAC<br>060</span>
+        <code class="chip-line">product.generated.json is stale</code>
+        <span class="badge" style="background:#191919;color:#fbcc00">Staleness</span>
+      </article>
+    </div>
+  </div>
+
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Your product spec, <span class="hl">compiled.</span></h1>
+
+      <p class="lede hero-sub">
+        Your glossary, constraints, business rules, features and decisions usually live as
+        hopeful markdown that quietly rots. FastPDLC turns them into <strong>code</strong> —
+        typed artifacts, a validated reference graph, a compiled JSON bundle, and a CI gate
+        that goes red the moment reality drifts.
+      </p>
+
+      <div class="hero-actions">
+        <div class="copy-block">
+          <code id="cmdInstall">pip install fastpdlc</code>
+          <button class="copy-btn" data-copy="#cmdInstall">Copy</button>
+        </div>
+        <a class="btn btn-primary" href="#start">Get started</a>
+      </div>
+
+      <div class="hero-meta">
+        <span><svg class="tick" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="#00b67a" stroke="#191919" stroke-width="2"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Zero-config CI gate</span>
+        <span><svg class="tick" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="#00b67a" stroke="#191919" stroke-width="2"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Any language, any repo</span>
+        <span><svg class="tick" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="#00b67a" stroke="#191919" stroke-width="2"/><path d="M6 10.4l2.6 2.6L14 7.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> LGPL-3.0, link it freely</span>
+      </div>
+    </div>
+
+    <div class="term reveal">
+      <div class="term-bar">
+        <span class="term-dot" style="background:#ff6b4a"></span>
+        <span class="term-dot" style="background:#fbcc00"></span>
+        <span class="term-dot" style="background:#00b67a"></span>
+        <span class="term-name">ci / product-as-code</span>
+      </div>
+      <div class="term-body">
+        <span class="l t-cmd">fastpdlc validate</span>
+        <span class="l t-err">ERROR <span class="t-code">PAC-020</span> <span class="t-path">product/terms/TERM-payment.md:</span> see_also 'TERM-leger'</span>
+        <span class="l t-err">                does not resolve to a terms id</span>
+        <span class="l t-err">ERROR <span class="t-code">PAC-060</span> build/product.generated.json is stale —</span>
+        <span class="l t-err">                run: fastpdlc build (and commit it)</span>
+        <span class="l t-warn">WARN  <span class="t-code">PAC-030</span> <span class="t-path">product/features/FEAT-refunds.md:</span> status</span>
+        <span class="l t-warn">                'in-progres' not in ['done', 'in-progress']</span>
+        <span class="l">&nbsp;</span>
+        <span class="l t-dim">fastpdlc: terms 42, rules 18, features 39 — 2 error(s), 1 warning(s).</span>
+        <span class="l t-cmd">echo $?</span>
+        <span class="l t-err">1</span>
+        <span class="l t-cmd"><span class="caret"></span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ problem ══════════════════════════════════════════════════════════ -->
+<section class="section band-cream" id="problem">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The rot</span>
+      <h2>You wrote it down, but&hellip;</h2>
+      <p class="lede">Every team has the documents. Almost no team has a mechanism that
+        notices when they stop being true.</p>
+    </div>
+
+    <div class="problem-stage reveal">
+      <div class="bubble b1">&ldquo;The glossary contradicts the API docs.&rdquo;</div>
+      <div class="bubble pale b2">&ldquo;Three features reference a rule we deleted in March.&rdquo;</div>
+      <div class="bubble pale b3">&ldquo;The spec says v2. We shipped v3 last quarter.&rdquo;</div>
+      <div class="bubble b4">&ldquo;Which of these four docs is canonical?&rdquo;</div>
+
+      <div class="doc doc-1" aria-hidden="true">
+        <div class="doc-title">requirements-v2-FINAL.md</div>
+        <div class="doc-line w92"></div><div class="doc-line w60"></div>
+        <div class="doc-line w80"></div><div class="doc-line w45"></div>
+      </div>
+
+      <div class="doc doc-2" aria-hidden="true">
+        <div class="doc-title">glossary (copy).docx</div>
+        <div class="doc-line w80"></div><div class="doc-line w92"></div>
+        <div class="doc-line w45"></div><div class="doc-line w60"></div>
+      </div>
+
+      <div class="doc doc-3">
+        <div class="doc-title">product/spec.md</div>
+        <div class="doc-line w92 struck"></div>
+        <div class="doc-line w80"></div>
+        <div class="doc-line w60 struck"></div>
+        <div class="doc-line w92"></div>
+        <div class="doc-line w45 struck"></div>
+        <div class="stamp">LAST TRUE: 14 MONTHS AGO</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ how it works ═════════════════════════════════════════════════════ -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>Declare it. Author it. Gate it.</h2>
+      <p class="lede">One config file, plain markdown artifacts, and a command whose exit
+        code is the whole contract.</p>
+    </div>
+
+    <div class="steps">
+      <article class="card step reveal">
+        <div class="step-n">01</div>
+        <h3>Declare your types</h3>
+        <p>There is no fixed schema. You name the collections, the required fields, the id
+          prefixes, the allowed values, and which fields must resolve to other artifacts.</p>
+<pre><code><span class="c"># product.config.yaml</span>
+<span class="k">product_dir</span>: product
+<span class="k">output</span>: build/product.generated.json
+<span class="k">types</span>:
+  - <span class="k">name</span>: terms
+    <span class="k">dir</span>: terms
+    <span class="k">id_prefix</span>: <span class="s">"TERM-"</span>
+    <span class="k">required</span>: [id, term, definition]
+    <span class="k">fields</span>: [term, definition, see_also]
+    <span class="k">references</span>:
+      - <span class="k">field</span>: see_also
+        <span class="k">to</span>: terms</code></pre>
+      </article>
+
+      <article class="card step reveal">
+        <div class="step-n">02</div>
+        <h3>Author the artifacts</h3>
+        <p>Markdown with YAML frontmatter, one file per artifact, in your repo, reviewed in
+          pull requests like everything else. The prose below the fence is yours.</p>
+<pre><code><span class="c">&lt;!-- product/terms/TERM-payment.md --&gt;</span>
+<span class="c">---</span>
+<span class="k">id</span>: <span class="y">TERM-payment</span>
+<span class="k">term</span>: Payment
+<span class="k">definition</span>: An instruction to move
+  money between two parties.
+<span class="k">see_also</span>: [<span class="y">TERM-ledger</span>]
+<span class="c">---</span>
+The canonical unit of work in
+the system.</code></pre>
+      </article>
+
+      <article class="card step reveal">
+        <div class="step-n">03</div>
+        <h3>Gate the build</h3>
+        <p>Compile the bundle, commit it, and let CI prove it still matches the source.
+          Non-zero exit means the pull request does not merge.</p>
+<pre><code><span class="c"># .github/workflows/product.yml</span>
+<span class="k">jobs</span>:
+  <span class="k">validate</span>:
+    <span class="k">runs-on</span>: ubuntu-latest
+    <span class="k">steps</span>:
+      - <span class="k">uses</span>: actions/checkout@v4
+      - <span class="k">uses</span>: <span class="p">tarvitave/fastpdlc@v0.1.0</span>
+        <span class="k">with</span>:
+          <span class="k">config</span>: product.config.yaml
+          <span class="k">plugin</span>: product_hooks.py</code></pre>
+      </article>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ diagnostics ══════════════════════════════════════════════════════ -->
+<section class="section" id="diagnostics">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">The enforcers</span>
+      <h2>Seven codes stand between you and drift.</h2>
+      <p class="lede">Every finding carries a stable <code style="font-family:var(--mono)">PAC-NNN</code>
+        code. Codes are an API — CI, dashboards and humans match on the code, never the
+        prose. Existing codes are never renumbered.</p>
+    </div>
+
+    <div class="diags">
+      <article class="diag reveal" style="--c:#ff6b4a; --c2:#fff">
+        <div class="diag-code">PAC-001</div>
+        <h3>Required field</h3>
+        <p>An artifact is missing a field its type declares as required.</p>
+        <code class="sample">missing required field 'definition'</code>
+        <span class="badge">Schema</span>
+      </article>
+
+      <article class="diag reveal" style="--c:#4a90e2; --c2:#fbcc00">
+        <div class="diag-code">PAC-010</div>
+        <h3>Id prefix</h3>
+        <p>An id does not start with the <code style="font-family:var(--mono)">id_prefix</code> its type requires.</p>
+        <code class="sample">id 'payment' must start with 'TERM-'</code>
+        <span class="badge">Identity</span>
+      </article>
+
+      <article class="diag reveal" style="--c:#00b67a; --c2:#fff">
+        <div class="diag-code">PAC-011</div>
+        <h3>Filename match</h3>
+        <p>The id and the filename disagree, so the artifact can't be found by either.</p>
+        <code class="sample">id 'TERM-payment' must match its filename</code>
+        <span class="badge">Identity</span>
+      </article>
+
+      <article class="diag reveal" style="--c:#b47cff; --c2:#fff">
+        <div class="diag-code">PAC-012</div>
+        <h3>Duplicate id</h3>
+        <p>Two artifacts in one collection claim the same id. References become ambiguous.</p>
+        <code class="sample">duplicate id 'BR-idempotent' in type 'rules'</code>
+        <span class="badge">Identity</span>
+      </article>
+
+      <article class="diag reveal" style="--c:#8b1538; --c2:#fbcc00">
+        <div class="diag-code">PAC-020</div>
+        <h3>Dangling reference</h3>
+        <p>A reference field points at an artifact that does not exist. This is the one
+          that catches renames and deletions before a reviewer ever opens the PR.</p>
+        <code class="sample">see_also 'TERM-leger' does not resolve to a terms id</code>
+        <span class="badge">Graph</span>
+      </article>
+
+      <article class="diag reveal" style="--c:#ff8fd0; --c2:#fff">
+        <div class="diag-code">PAC-030</div>
+        <h3>Enum violation</h3>
+        <p>A field value is outside the allowed set its type declares.</p>
+        <code class="sample">status 'in-progres' not in ['done', 'in-progress']</code>
+        <span class="badge">Schema</span>
+      </article>
+
+      <article class="diag diag-hero reveal" style="--c:#fbcc00; --c2:#191919">
+        <div>
+          <div class="diag-code">PAC-060</div>
+          <h3>Staleness — the one nobody else has</h3>
+          <p>The committed bundle no longer matches the artifacts that produced it.
+            Somebody edited the source and didn't rebuild, or edited the build and didn't
+            touch the source. Either way, what you ship and what you wrote have parted
+            company — and CI says so, in the diff, on the pull request.</p>
+        </div>
+        <div>
+          <code class="sample" style="font-size:0.78rem;line-height:1.7">build/product.generated.json is stale<br>— run: fastpdlc build (and commit it)</code>
+          <p style="margin-top:0.9rem;font-size:0.9rem;font-weight:600">
+            Plugin outputs are staleness-gated too, so a generated catalogue or a runtime
+            manifest can never quietly fall behind.
+          </p>
+        </div>
+        <span class="badge" style="background:#191919;color:#fbcc00">Drift</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══ timeline ═════════════════════════════════════════════════════════ -->
+<section class="section band-ink" id="timeline">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" style="color:var(--yellow)">A day in the life</span>
+      <h2>Life of a pull request.</h2>
+      <p class="lede" style="color:#b8b8b8">Someone renames one term. Here is what happens
+        with FastPDLC in the loop — and what would have happened without it.</p>
+    </div>
+
+    <div class="timeline">
+      <article class="tl reveal">
+        <div class="tl-time">09:14</div>
+        <div>
+          <h3>A rename lands.</h3>
+          <p>An engineer decides <code>TERM-payment</code> was always the wrong word and
+            renames it to <code>TERM-charge</code> in a pull request. One file changed.
+            Looks harmless.</p>
+        </div>
+      </article>
+
+      <article class="tl hit reveal">
+        <div class="tl-time">09:14</div>
+        <div>
+          <h3>CI goes red before a human looks.</h3>
+          <p>Three artifacts referenced the old id — two terms and a business rule. The
+            graph no longer resolves, so the gate fails with the file and field named.</p>
+          <span class="tag">PAC-020 &times;3</span>
+        </div>
+      </article>
+
+      <article class="tl reveal">
+        <div class="tl-time">09:22</div>
+        <div>
+          <h3>The graph gets fixed, not the prose.</h3>
+          <p>Three <code>see_also</code> values updated, <code>fastpdlc build</code> run
+            once. The bundle regenerates deterministically — sorted keys, byte-stable
+            output, so the diff is exactly the change and nothing else.</p>
+        </div>
+      </article>
+
+      <article class="tl pass reveal">
+        <div class="tl-time">09:23</div>
+        <div>
+          <h3>Staleness clears.</h3>
+          <p>The committed <code>product.generated.json</code> matches its sources again.
+            Green. The reviewer now reviews a decision, not a consistency puzzle.</p>
+          <span class="tag ok">PAC-060 resolved</span>
+        </div>
+      </article>
+
+      <article class="tl reveal">
+        <div class="tl-time">09:31</div>
+        <div>
+          <h3>Merged — and everything downstream already knows.</h3>
+          <p>The docs site, the in-app glossary, the internal catalogue and the context you
+            hand an LLM all render from the same bundle. Nobody wrote a migration doc.
+            Nobody had to remember.</p>
+        </div>
+      </article>
+
+      <article class="tl reveal" style="border-style:dashed;border-color:#555">
+        <div class="tl-time" style="color:#777">&mdash;</div>
+        <div>
+          <h3 style="color:#999">Without the gate</h3>
+          <p>The rename merges. Three documents keep pointing at a term that no longer
+            exists. Nobody notices for eleven months, and by then two of them have been
+            copied into a slide deck.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══ plugins ══════════════════════════════════════════════════════════ -->
+<section class="section" id="plugins">
+  <div class="wrap split">
+    <div class="reveal">
+      <span class="eyebrow">Plugins</span>
+      <h2 style="margin-top:0.9rem">Your checks. Your codes. No fork.</h2>
+      <p class="lede" style="margin-top:1.1rem">Real projects need more than schema. A plugin
+        registers project-specific validators, enriches the bundle, and emits extra generated
+        outputs — which is how a large codebase migrates onto FastPDLC with no loss of
+        functionality.</p>
+
+      <ul class="feature-list">
+        <li>
+          <span class="n">fn</span>
+          <span><b>Validators</b><span>Cross-file checks the config can't express — does this
+            <code style="font-family:var(--mono)">links.code</code> path actually exist on disk?</span></span>
+        </li>
+        <li>
+          <span class="n">&#8644;</span>
+          <span><b>Bundle transformers</b><span>Derived fields computed at build time: reverse
+            edges, rollups, denormalised views your renderer wants.</span></span>
+        </li>
+        <li>
+          <span class="n">&#10515;</span>
+          <span><b>Extra outputs</b><span>Emit a runtime catalogue or manifest alongside the
+            bundle — and it is staleness-gated exactly like the bundle is.</span></span>
+        </li>
+        <li>
+          <span class="n">9xx</span>
+          <span><b>Your own diagnostic codes</b><span>Register codes in a project range so they
+            never collide with the core set. Your CI matches on them the same way.</span></span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="reveal">
+<pre style="box-shadow:var(--sh-lg);border:var(--bd);border-radius:var(--r);padding:1.3rem 1.4rem;font-size:0.83rem"><code><span class="c"># product_hooks.py</span>
+<span class="o">from</span> fastpdlc <span class="o">import</span> register
+
+<span class="o">def</span> <span class="p">register</span>(reg):
+    register(<span class="s">"PAC-900"</span>, <span class="s">"links.code path does not exist"</span>)
+
+    <span class="y">@reg.validator</span>
+    <span class="o">def</span> <span class="p">code_paths_exist</span>(bundle, config, root, report):
+        <span class="o">for</span> f <span class="o">in</span> bundle[<span class="s">"features"</span>]:
+            <span class="o">for</span> path <span class="o">in</span> f.get(<span class="s">"code"</span>) <span class="o">or</span> []:
+                <span class="o">if not</span> (root / path).exists():
+                    report.add(<span class="s">"PAC-900"</span>,
+                               <span class="s">f"missing {path}"</span>,
+                               f[<span class="s">"_file"</span>])
+
+    <span class="y">@reg.bundle_transformer</span>
+    <span class="o">def</span> <span class="p">reverse_edges</span>(bundle, config, root):
+        ...  <span class="c"># enrich the bundle in place</span>
+
+    reg.extra_output(<span class="s">"build/catalogue.json"</span>, render)</code></pre>
+
+      <div class="copy-block" style="margin-top:1.2rem;max-width:none">
+        <code id="cmdPlugin">fastpdlc -p product_hooks.py validate</code>
+        <button class="copy-btn" data-copy="#cmdPlugin">Copy</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ══ proof ════════════════════════════════════════════════════════════ -->
+<section class="section band-cream" id="proof">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Used in production</span>
+      <h2>Extracted from a payments platform, not a demo.</h2>
+      <p class="lede">FastPDLC is the product-as-code engine of the
+        <strong>pharthing / KibiPay</strong> payments platform. It was pulled out of a
+        working system so any team could use it.</p>
+    </div>
+
+    <div class="stats reveal">
+      <div class="stat"><div class="stat-n">39</div><div class="stat-l">features under the gate</div></div>
+      <div class="stat"><div class="stat-n">283<span style="font-size:0.5em">KB</span></div><div class="stat-l">render bundle compiled</div></div>
+      <div class="stat"><div class="stat-n">1</div><div class="stat-l">CI gate — the only one</div></div>
+      <div class="stat"><div class="stat-n">0</div><div class="stat-l">bytes lost in extraction</div></div>
+    </div>
+
+    <div class="proof-note reveal">
+      <span class="badge">Parity test</span>
+      <p>pharthing's CI runs <strong>fastpdlc validate</strong> as its sole product gate,
+        via a plugin that adds its domain-specific checks. A
+        <strong>byte-identical parity test</strong> proves the extracted engine produces
+        exactly the bundle the original in-house one did — nothing was lost on the way out.
+        That's the plugin system, doing real work, in production.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ scaffold ═════════════════════════════════════════════════════════ -->
+<section class="scaffold" id="start">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">Start in one command</span>
+      <h2 style="margin-top:0.8rem">A valid product-as-code repo on its first commit.</h2>
+      <p>The copier template scaffolds the config, example artifacts and the CI gate.
+        <code style="font-family:var(--mono);font-weight:600">--trust</code> lets it run
+        <code style="font-family:var(--mono);font-weight:600">fastpdlc build</code> once so
+        the new repo is green before you've written a line.</p>
+    </div>
+    <div style="min-width:min(100%, 30rem)">
+      <div class="copy-block">
+        <code id="cmdCopier">pipx run copier copy --trust gh:tarvitave/fastpdlc my-product-repo</code>
+        <button class="copy-btn" data-copy="#cmdCopier">Copy</button>
+      </div>
+      <div style="display:flex;gap:0.8rem;margin-top:1rem;flex-wrap:wrap">
+        <a class="btn" href="https://github.com/tarvitave/fastpdlc#quickstart">Read the quickstart</a>
+        <a class="btn" href="https://pypi.org/project/fastpdlc/">View on PyPI</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ faq ══════════════════════════════════════════════════════════════ -->
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Questions</span>
+      <h2>The obvious objections.</h2>
+    </div>
+
+    <div class="faq">
+      <details>
+        <summary>How is this different from Confluence, Notion, or a docs site?</summary>
+        <div class="answer">Those store prose and trust people to keep it honest. FastPDLC
+          stores <em>typed artifacts</em> with a declared schema and a reference graph, and it
+          runs in CI. Nothing merges while the graph is broken. It's a compiler, not a wiki —
+          and you can keep your wiki, rendering it from the bundle.</div>
+      </details>
+
+      <details>
+        <summary>Does it replace my documentation site?</summary>
+        <div class="answer">No. It produces <code>product.generated.json</code>. Your docs site,
+          your app's in-product glossary, your internal catalogue and the context you feed an
+          LLM all render from that one bundle — so they can't disagree with each other.</div>
+      </details>
+
+      <details>
+        <summary>My artifacts don't look like your glossary and rules.</summary>
+        <div class="answer">There is no built-in schema. You declare your own collections,
+          required fields, id prefixes, allowed values and reference edges in
+          <code>product.config.yaml</code>. Terms and business rules are just what the quickstart
+          happens to use. Decisions, features, personas, risks, invariants, migrations — all the
+          same mechanism.</div>
+      </details>
+
+      <details>
+        <summary>What if I need a check the config can't express?</summary>
+        <div class="answer">Write a plugin. Register validators, bundle transformers and extra
+          generated outputs, plus your own diagnostic codes in a project range like
+          <code>9xx</code> so they never collide with the core set. No fork, no patched engine —
+          this is how a large existing project migrates without losing any of its bespoke
+          checks.</div>
+      </details>
+
+      <details>
+        <summary>Does this only work in Python repositories?</summary>
+        <div class="answer">The CLI is Python — <code>pip install fastpdlc</code>, or use the
+          GitHub Action which installs it for you. What it validates is plain markdown with YAML
+          frontmatter, so the repository itself can be Go, TypeScript, Rust, Java or anything
+          else. Nothing about your build system has to change.</div>
+      </details>
+
+      <details>
+        <summary>Why commit the generated bundle? Isn't that a build artifact?</summary>
+        <div class="answer">Because that's what makes <code>PAC-060</code> possible. If the
+          bundle only exists inside CI, nothing can prove that what you ship matches what you
+          wrote. Committing it turns invisible drift into a visible diff on a pull request —
+          and makes the build deterministic and reviewable.</div>
+      </details>
+
+      <details>
+        <summary>Why LGPL-3.0?</summary>
+        <div class="answer">Copyleft on FastPDLC itself, so improvements to the engine come
+          back. It's the <em>lesser</em> GPL deliberately: importing it as a library, or running
+          it in your CI, does not make your project LGPL. Your product artifacts and your
+          plugins are yours.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ══ final CTA ════════════════════════════════════════════════════════ -->
+<section class="section band-cream cta">
+  <div class="wrap">
+    <h2 class="reveal">Ship the gate this week.</h2>
+    <p class="lede reveal">Install it, declare two types, commit the bundle. The first
+      <code style="font-family:var(--mono)">PAC-020</code> you catch will pay for the
+      afternoon.</p>
+
+    <div class="cta-actions reveal">
+      <a class="btn btn-primary btn-lg" href="https://github.com/tarvitave/fastpdlc">Get started on GitHub</a>
+      <a class="btn btn-lg" href="#how">See how it works</a>
+    </div>
+
+    <form class="signup reveal" id="signupForm" novalidate>
+      <div class="signup-row">
+        <label class="hp" for="company">Company (leave blank)</label>
+        <input class="hp" type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        <label class="hp" for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="email">
+        <button class="btn btn-primary" type="submit">Keep me posted</button>
+      </div>
+      <p class="hint">Release notes and new diagnostic codes. No more than monthly, unsubscribe in one click.</p>
+      <p class="msg" id="signupMsg" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ footer ═══════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+        <p class="footer-blurb">Product-as-code as a validated graph — for any project.
+          Typed artifacts in, a compiled bundle out, and a CI gate in between.</p>
+      </div>
+
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#diagnostics">Diagnostic codes</a></li>
+          <li><a href="#plugins">Plugins</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4>Code</h4>
+        <ul>
+          <li><a href="https://github.com/tarvitave/fastpdlc">GitHub</a></li>
+          <li><a href="https://pypi.org/project/fastpdlc/">PyPI</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc/issues">Issues</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc/blob/main/RELEASING.md">Releases</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="https://github.com/tarvitave/fastpdlc/blob/main/LICENSE">LGPL-3.0-or-later</a></li>
+          <li><a href="/privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-base">
+      <span>&copy; <span id="year">2026</span> FastPDLC. Built as a validated graph, naturally.</span>
+      <span><code style="font-family:var(--mono)">pip install fastpdlc</code></span>
+    </div>
+  </div>
+</footer>
+
+<script src="/main.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+# fastpdlc.com — Caddy handles TLS certificates automatically via Let's Encrypt.
+# Point the A/AAAA records at the server first; certificates are issued on boot.
+
+{
+	email {$ACME_EMAIL}
+	# Uncomment while testing so you don't burn Let's Encrypt rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# www redirects to the apex so there is one canonical origin.
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# Sent on every response.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		X-Frame-Options           "SAMEORIGIN"
+		Permissions-Policy        "geolocation=(), microphone=(), camera=(), interest-cohort=()"
+		-Server
+	}
+
+	# ── lead capture / future CRM endpoints ──────────────────────────────
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# ── self-hosted analytics, only routed when the profile is running ───
+	# Serving it from our own origin means no third-party requests and no
+	# ad-blocker breakage. Remove this block if you don't run the profile.
+	handle /stats/* {
+		uri strip_prefix /stats
+		reverse_proxy umami:3000
+	}
+
+	# ── the static site ──────────────────────────────────────────────────
+	handle {
+		root * /srv
+
+		# Fingerprinted assets could be cached forever; these aren't, so keep
+		# it short enough that a deploy is visible within the hour.
+		@assets path *.css *.js *.svg *.png *.woff2
+		header @assets Cache-Control "public, max-age=3600, must-revalidate"
+		header /index.html Cache-Control "public, max-age=300, must-revalidate"
+
+		try_files {path} {path}/ {path}.html
+		file_server
+	}
+
+	handle_errors {
+		@404 expression {err.status_code} == 404
+		rewrite @404 /404.html
+		file_server {
+			root /srv
+		}
+	}
+}

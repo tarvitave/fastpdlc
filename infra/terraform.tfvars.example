@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Get a token: Hetzner Cloud Console -> your project -> Security -> API tokens
+# -> Generate, permission "Read & Write".
+
+hcloud_token = ""
+
+# ── optional: everything below already has a sensible default ─────────────
+
+# cx23 = 2 vCPU / 4 GB / 40 GB NVMe, EUR 5.49/mo ex-VAT.
+# server_type = "cx23"
+
+# fsn1 Falkenstein, nbg1 Nuremberg, hel1 Helsinki (EU)
+# ash Ashburn, hil Hillsboro (US); sin Singapore. Same price.
+# location = "fsn1"
+
+# Point this at the key GitHub Actions will deploy with, if you generated a
+# dedicated one (see .github/workflows/deploy-site.yml).
+# ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
+# Narrow port 22 to your own address if you have a static one.
+# ssh_allowed_ips = ["203.0.113.4/32"]
+
+# Daily backups, +20% of the server price (~EUR 1.10/mo).
+# enable_backups = true

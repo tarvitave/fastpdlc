@@ -1,0 +1,76 @@
+# fastpdlc.com
+#
+#   docker compose up -d                        site + lead capture   (~250 MB RAM)
+#   docker compose --profile analytics up -d    ... plus Umami        (~700 MB RAM)
+#
+# Everything is on one internal network; only Caddy publishes ports.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"        # HTTP/3
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # ONLY public/ is the webroot. Never mount the compose directory itself —
+      # .env, the Caddyfile and the API source would all become downloadable.
+      - ./public:/srv:ro
+      - caddy_data:/data                 # certificates — losing this re-issues them
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      LEADS_DB: /data/leads.db
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
+      IP_SALT: ${IP_SALT:?set IP_SALT in .env}
+    volumes:
+      - api_data:/data
+    expose:
+      - "8000"
+
+  # ── optional: cookieless, self-hosted analytics ────────────────────────
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    profiles: ["analytics"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami}@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET in .env}
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    expose:
+      - "3000"
+
+  umami-db:
+    image: postgres:16-alpine
+    profiles: ["analytics"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
+    volumes:
+      - umami_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  caddy_data:
+  caddy_config:
+  api_data:
+  umami_db:

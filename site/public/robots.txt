@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /stats/
+Disallow: /og.html
+
+Sitemap: https://fastpdlc.com/sitemap.xml
