@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · FastPDLC</title>
+<meta property="og:title" content="Privacy · FastPDLC">
+<link rel="canonical" href="https://fastpdlc.com/privacy.html">
+<meta name="description" content="Short version: an email address if you type one into the form, and aggregate page counts. No cookies, no third-party trackers, no advertising networks.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23191919'/><text x='50' y='72' font-family='Arial Narrow,Impact,sans-serif' font-size='62' font-weight='900' fill='%23fbcc00' text-anchor='middle'>F</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .prose { max-width: 42rem; }
+  .prose h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin-top: 2.6rem; }
+  .prose p, .prose li { margin-top: 0.9rem; }
+  .prose ul { padding-left: 1.2rem; }
+  .prose code { font-family: var(--mono); font-size: 0.9em; background: var(--cream); border: 1px solid #e2d6a8; border-radius: 5px; padding: 0.05em 0.35em; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+    <nav class="nav-links">
+      <a href="/#how">How it works</a>
+      <a href="/#faq">FAQ</a>
+      <a href="https://github.com/tarvitave/fastpdlc">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="section">
+  <div class="wrap prose">
+    <span class="eyebrow">Privacy</span>
+    <h1 style="font-size:clamp(2.4rem,5vw,3.4rem);margin-top:0.8rem">What this site collects.</h1>
+
+    <p class="lede" style="margin-top:1.2rem">Short version: an email address if you type one
+      into the form, and aggregate page counts. No cookies, no third-party trackers, no
+      advertising networks.</p>
+
+    <h2>If you subscribe</h2>
+    <p>The form stores the email address you enter, the word <code>landing</code> to record
+      where it came from, the time, and a salted one-way hash of your IP address used only for
+      rate limiting. The hash cannot be reversed to an IP.</p>
+    <p>The address is used to send release notes and news about new diagnostic codes, no more
+      than monthly. It is not sold, rented, or shared. Every email carries an unsubscribe link,
+      and you can ask for deletion at any time at the address below.</p>
+
+    <h2>Analytics</h2>
+    <p>Page views are counted with a self-hosted, cookieless analytics instance running on the
+      same server as this site. It records the page URL, referrer, rough screen size, and a
+      country derived from the IP address, which is not stored. Nothing follows you to other
+      sites, and no data leaves this server.</p>
+
+    <h2>Fonts and third parties</h2>
+    <p>Typefaces are served from Google Fonts, which means your browser makes a request to
+      <code>fonts.googleapis.com</code> and <code>fonts.gstatic.com</code>. If that matters to
+      you, it matters to us too — see the note in the repository about self-hosting them.</p>
+
+    <h2>Hosting</h2>
+    <p>The site runs on a server in the European Union. Standard web server logs (IP address,
+      request line, user agent) are kept briefly for operational and security purposes and then
+      rotated away.</p>
+
+    <h2>Your rights and contact</h2>
+    <p>You can ask what is stored about you, ask for a copy, or ask for it to be deleted.
+      Open an issue on <a href="https://github.com/tarvitave/fastpdlc/issues">GitHub</a>, or
+      write to the address listed in the repository.</p>
+
+    <p style="margin-top:2.5rem"><a class="btn" href="/">Back to the front page</a></p>
+  </div>
+</main>
+
+</body>
+</html>

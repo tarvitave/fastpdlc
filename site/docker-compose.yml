@@ -1,0 +1,96 @@
+# fastpdlc.com
+#
+#   docker compose up -d                        site + lead capture   (~250 MB RAM)
+#   docker compose --profile analytics up -d    ... plus Umami        (~700 MB RAM)
+#
+# Everything is on one internal network; only Caddy publishes ports.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"        # HTTP/3
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # ONLY public/ is the webroot. Never mount the compose directory itself —
+      # .env, the Caddyfile and the API source would all become downloadable.
+      - ./public:/srv:ro
+      - caddy_data:/data                 # certificates — losing this re-issues them
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    # Runs as the host owner of ./public so the SEO job and the newsletter archive
+    # can write there. The image's own uid cannot: a bind mount keeps host ownership.
+    user: "1000:1000"
+    environment:
+      LEADS_DB: /data/leads.db
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
+      IP_SALT: ${IP_SALT:?set IP_SALT in .env}
+      # admin panel
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      # newsletter -- NEWSLETTER_AUTOSEND is the kill switch for unattended sending
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      POSTMARK_TOKEN: ${POSTMARK_TOKEN:-}
+      NEWSLETTER_FROM: ${NEWSLETTER_FROM:-marketing@fastpdlc.com}
+      NEWSLETTER_AUTOSEND: ${NEWSLETTER_AUTOSEND:-off}
+      NEWSLETTER_MAX_RECIPIENTS: ${NEWSLETTER_MAX_RECIPIENTS:-2000}
+      # seo
+      SEO_AUTOFIX: ${SEO_AUTOFIX:-on}
+      PUBLIC_DIR: /srv/public
+      BLOG_BUNDLE: /srv/content/build/blog.generated.json
+    volumes:
+      - api_data:/data
+      # writable: the SEO job applies safe fixes and the newsletter writes its archive
+      - ./public:/srv/public
+      - ./content:/srv/content:ro
+    expose:
+      - "8000"
+
+  # ── optional: cookieless, self-hosted analytics ────────────────────────
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    profiles: ["analytics"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami}@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:?set UMAMI_APP_SECRET in .env}
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    expose:
+      - "3000"
+
+  umami-db:
+    image: postgres:16-alpine
+    profiles: ["analytics"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
+    volumes:
+      - umami_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  caddy_data:
+  caddy_config:
+  api_data:
+  umami_db:

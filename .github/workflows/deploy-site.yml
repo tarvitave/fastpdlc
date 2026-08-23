@@ -1,0 +1,77 @@
+# Deploy fastpdlc.com.
+#
+# This does NOT provision anything — the server is created once with Terraform
+# from infra/, and the Hetzner token stays on a developer machine. All this job
+# needs is ssh access to a box that already exists.
+#
+# Required repository secrets:
+#   SSH_PRIVATE_KEY   private half of a key in the deploy user's authorized_keys
+# Required repository variables:
+#   DEPLOY_HOST       fastpdlc.com (or the bare IP)
+#   DEPLOY_USER       deploy
+name: deploy-site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+# Never let two deploys interleave an rsync.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load ssh key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo "::error::SSH_PRIVATE_KEY secret is not set"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Trust-on-first-use. To pin instead, store the output of
+          # `ssh-keyscan fastpdlc.com` as a secret and write it here.
+          ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync site
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_deploy -o BatchMode=yes" \
+            --exclude '.env' \
+            --exclude '__pycache__' \
+            site/public site/api site/Caddyfile site/docker-compose.yml site/.env.example \
+            "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:/opt/fastpdlc-site/"
+
+      - name: Bring the stack up
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes \
+            "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}" \
+            'cd /opt/fastpdlc-site && docker compose up -d --build && docker compose ps'
+
+      - name: Verify it answers
+        run: |
+          set -euo pipefail
+          for path in / /api/health; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "https://${{ vars.DEPLOY_HOST }}${path}")
+            echo "  ${path} -> ${code}"
+            [ "$code" = "200" ] || { echo "::error::${path} returned ${code}"; exit 1; }
+          done
+
+      - name: Clean up key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy

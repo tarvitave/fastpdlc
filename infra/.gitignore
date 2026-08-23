@@ -1,0 +1,7 @@
+# Terraform state contains resource detail and must never be committed.
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+*.auto.tfvars
+crash.log

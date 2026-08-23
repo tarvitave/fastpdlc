@@ -5,6 +5,7 @@ Diagnostics carry stable PAC-NNN codes (see :mod:`fastpdlc.diagnostics`).
 """
 from __future__ import annotations
 
+import datetime
 import json
 import pathlib
 
@@ -66,8 +67,20 @@ def _transformed_bundle(config: Config, root, registry) -> dict:
     return bundle
 
 
+def _json_default(obj):
+    """YAML parses an unquoted ``2026-02-04`` into a ``datetime.date``, which json
+    cannot serialize. Dates are far too common in frontmatter (``date``, ``due``,
+    ``reviewed``) to expect every author to remember quoting them, so normalise to
+    ISO-8601 strings -- stable, sortable, and byte-identical across runs."""
+    if isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
+        return obj.isoformat()
+    raise TypeError(f"cannot serialize {type(obj).__name__} into the bundle")
+
+
 def _dump(bundle: dict, sort_keys: bool = True) -> str:
-    return json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=sort_keys) + "\n"
+    return json.dumps(
+        bundle, indent=2, ensure_ascii=False, sort_keys=sort_keys, default=_json_default
+    ) + "\n"
 
 
 def render_bundle(config: Config, root: str | pathlib.Path = ".", registry=None) -> str:

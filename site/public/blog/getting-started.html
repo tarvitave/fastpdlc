@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product-as-code in thirty minutes — FastPDLC</title>
+<meta name="description" content="A working glossary, a rulebook, and a CI gate, starting from an empty directory.">
+<link rel="canonical" href="https://fastpdlc.com/blog/getting-started.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Product-as-code in thirty minutes — FastPDLC">
+<meta property="og:description" content="A working glossary, a rulebook, and a CI gate, starting from an empty directory.">
+<meta property="og:url" content="https://fastpdlc.com/blog/getting-started.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23191919'/><text x='50' y='72' font-family='Arial Narrow,Impact,sans-serif' font-size='62' font-weight='900' fill='%23fbcc00' text-anchor='middle'>F</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/blog.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Product-as-code in thirty minutes", "description": "A working glossary, a rulebook, and a CI gate, starting from an empty directory.", "datePublished": "2026-06-17", "author": {"@type": "Organization", "name": "FastPDLC"}, "url": "https://fastpdlc.com/blog/getting-started.html"}</script>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+    <nav class="nav-links" id="navLinks">
+      <a href="/#how">How it works</a>
+      <a href="/#diagnostics">Diagnostics</a>
+      <a href="/blog/">Blog</a>
+      <a href="/#faq">FAQ</a>
+      <a href="https://github.com/tarvitave/fastpdlc">GitHub</a>
+      <a class="btn btn-primary nav-cta" href="/#start">Get started</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="section post">
+  <div class="wrap post-wrap">
+    <a class="back-link" href="/blog/">&larr; All posts</a>
+    <span class="badge" style="background:#00b67a;color:#fff">practice</span>
+    <h1>Product-as-code in thirty minutes</h1>
+    <p class="lede post-summary">A working glossary, a rulebook, and a CI gate, starting from an empty directory.</p>
+    <div class="post-meta">17 June 2026 &middot; 5 min read
+      &middot; FastPDLC</div>
+    <div class="post-body">
+      <p>The fastest way to understand this is to run it. Thirty minutes, start to finish.</p>
+<h2>Install</h2>
+<pre><code>pip install fastpdlc</code></pre>
+<p>Or scaffold a complete repository -- config, example artifacts and the CI gate -- in one command:</p>
+<pre><code>pipx run copier copy --trust gh:tarvitave/fastpdlc my-product-repo</code></pre>
+<p><code>--trust</code> lets the template run <code>fastpdlc build</code> once so the new repository is valid on its first commit.</p>
+<h2>Declare two types</h2>
+<p><code>product.config.yaml</code>:</p>
+<pre><code>product_dir: product
+output: build/product.generated.json
+types:
+  - name: terms
+    dir: terms
+    id_prefix: &quot;TERM-&quot;
+    required: [id, term, definition]
+    fields: [term, definition, see_also]
+    references:
+      - field: see_also
+        to: terms
+  - name: rules
+    dir: rules
+    id_prefix: &quot;BR-&quot;
+    required: [id, title, statement]
+    fields: [title, statement]</code></pre>
+<h2>Write an artifact</h2>
+<p><code>product/terms/TERM-payment.md</code>:</p>
+<pre><code>---
+id: TERM-payment
+term: Payment
+definition: An instruction to move money between two parties.
+see_also: [TERM-ledger]
+---
+The canonical unit of work in the system.</code></pre>
+<p>Note <code>see_also</code> points at <code>TERM-ledger</code>. Build now and it fails, because that term does not exist yet -- which is the tool working correctly. Write it, or drop the reference.</p>
+<h2>Build and validate</h2>
+<pre><code>fastpdlc build       # -&gt; build/product.generated.json  (commit it)
+fastpdlc validate    # schema + graph + staleness</code></pre>
+<p><code>validate</code> exits non-zero when it finds errors. That exit code is the entire contract.</p>
+<h2>Gate it</h2>
+<pre><code>name: product-as-code
+on: [pull_request, push]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: tarvitave/fastpdlc@v0.1.0</code></pre>
+<p>Commit the bundle alongside the artifacts. That is what makes staleness detectable.</p>
+<h2>Now break it on purpose</h2>
+<p>Worth five minutes: rename <code>TERM-ledger</code> and push. Watch <code>PAC-020</code> name the file that still references the old id. Delete a required field and watch <code>PAC-001</code>. Edit the committed bundle by hand and watch <code>PAC-060</code>.</p>
+<p>Seeing the failures is what makes the value concrete. Everything after this is adding collections and, eventually, a plugin.</p>
+    </div>
+    <div class="related"><h3>Related</h3><ul><li><a href="/blog/migrating-a-wiki.html">Migrating a wiki to product-as-code</a></li><li><a href="/blog/what-is-product-as-code.html">What product-as-code actually means</a></li></ul></div>
+  </div>
+</article>
+<section class="section band-cream">
+  <div class="wrap cta">
+    <span class="eyebrow">Newsletter</span>
+    <h2 style="margin-top:0.8rem">Get the next one by email.</h2>
+    <p class="lede" style="max-width:38rem;margin:1rem auto 0">Short notes on product-as-code,
+      new diagnostic codes, and what breaks in real repositories. Twice a week, unsubscribe in one click.</p>
+    <form class="signup" id="signupForm" novalidate>
+      <div class="signup-row">
+        <label class="hp" for="company">Company (leave blank)</label>
+        <input class="hp" type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        <label class="hp" for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="email">
+        <button class="btn btn-primary" type="submit">Subscribe</button>
+      </div>
+      <p class="msg" id="signupMsg" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+</main>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+        <p class="footer-blurb">Product-as-code as a validated graph &mdash; for any project.
+          Typed artifacts in, a compiled bundle out, and a CI gate in between.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/#diagnostics">Diagnostic codes</a></li>
+          <li><a href="/blog/">Blog</a></li>
+          <li><a href="/newsletters/">Newsletters</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/who-we-are.html">Who we are</a></li>
+          <li><a href="/contact.html">Contact us</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc">GitHub</a></li>
+          <li><a href="https://pypi.org/project/fastpdlc/">PyPI</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy policy</a></li>
+          <li><a href="/terms.html">Terms of use</a></li>
+          <li><a href="/sms-opt-in.html">SMS opt-in</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc/blob/main/LICENSE">LGPL-3.0-or-later</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>&copy; <span id="year">2026</span> FastPDLC. This blog is compiled and validated by FastPDLC itself.</span>
+      <span><code style="font-family:var(--mono)">pip install fastpdlc</code></span>
+    </div>
+  </div>
+</footer>
+<script src="/main.js" defer></script>
+</body>
+</html>
