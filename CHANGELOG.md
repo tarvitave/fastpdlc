@@ -12,6 +12,29 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.2.1] — 2026-08-23
+
+Packaging only. No library changes — `0.2.0` and `0.2.1` are identical to import
+and run.
+
+### Changed
+
+- **The sdist ships only the package.** `0.2.0`'s source distribution defaulted to
+  "everything not gitignored", which included the marketing site, the Terraform and
+  the deploy config — 125 files, 221 KB. It contained no secrets, but a published
+  artifact should not depend on a `.gitignore` staying correct forever, and a PyPI
+  version can be yanked and never replaced. The sdist is now an allowlist: 30
+  files, 42 KB, with no `site/`, `infra/` or `.fastpdlc/`.
+- `0.2.0` is yanked in favour of this release. It is safe — nothing secret was ever
+  in it — but there is no reason to keep distributing the wider tarball.
+
+### Added
+
+- `scripts/check_no_secrets.py` — refuses credential-shaped strings in the package
+  tree, and with `--dist` in the built artifacts, plus any operational path in the
+  sdist. Runs in CI on every push and in the publish workflow immediately before
+  upload, which is the last moment a leak is still recallable.
+
 ## [0.2.0] — 2026-08-23
 
 Two new surfaces on top of the compiler and the gate. `build` and `validate` are
@@ -83,6 +106,7 @@ verified by a byte-identical parity test.
 - LGPL-3.0-or-later: copyleft on the engine, and importing it as a library does not
   place your project under the LGPL.
 
-[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tarvitave/fastpdlc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tarvitave/fastpdlc/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tarvitave/fastpdlc/releases/tag/v0.1.0
