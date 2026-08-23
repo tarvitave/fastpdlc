@@ -21,7 +21,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='9' fill='%23191919'/><path d='M10.5 21.5 L17 28 L29.5 12.5' fill='none' stroke='%23fbcc00' stroke-width='4.6' stroke-linecap='round' stroke-linejoin='round'/><circle cx='10.5' cy='21.5' r='3.6' fill='%23fff'/><circle cx='29.5' cy='12.5' r='3.6' fill='%2300b67a'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=283011667f">
+<link rel="stylesheet" href="/styles.css?v=183d92d9d5">
 <link rel="stylesheet" href="/blog.css?v=615611b906">
 
 <script type="application/ld+json">
@@ -43,7 +43,7 @@
 <!-- ══ nav ══════════════════════════════════════════════════════════════ -->
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="logo" href="/" aria-label="FastPDLC home"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FASTPDLC</span></a>
+    <a class="logo" href="/" aria-label="FastPDLC home"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FastPDLC</span></a>
 
     <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
 
@@ -190,8 +190,8 @@
       <p class="lede hero-sub">
         Product intent lives as <strong>versioned source</strong>. A team of agents builds
         against it. Then a deterministic gate judges the result &mdash; the same
-        <code style="font-family:var(--mono)">PAC-NNN</code> rubric on every pull request,
-        including an agent's own. Agents propose, gates enforce, a human merges.
+        product-as-code (<code style="font-family:var(--mono)">PAC-NNN</code>) rubric on every
+        pull request, including an agent's own. Agents propose, gates enforce, a human merges.
       </p>
 
       <div class="hero-actions">
@@ -334,7 +334,7 @@ the system.</code></pre>
       <article class="card step reveal">
         <div class="step-n">03</div>
         <h3>Gate the build</h3>
-        <p>Compile the bundle, commit it, and let CI prove it still matches the source.
+        <p>Compile the bundle, commit it, and let CI (continuous integration) prove it still matches the source.
           Non-zero exit means the pull request does not merge.</p>
 <pre><code><span class="c"># .github/workflows/product.yml</span>
 <span class="k">jobs</span>:
@@ -359,9 +359,10 @@ the system.</code></pre>
     <div class="section-head reveal">
       <span class="eyebrow">The enforcers</span>
       <h2>Seven codes stand between you and drift.</h2>
-      <p class="lede">Every finding carries a stable <code style="font-family:var(--mono)">PAC-NNN</code>
-        code. Codes are an API — CI, dashboards and humans match on the code, never the
-        prose. Existing codes are never renumbered.</p>
+      <p class="lede">Every finding carries a stable <strong>PAC</strong> (product-as-code)
+        <code style="font-family:var(--mono)">PAC-NNN</code> code. Codes are an API — continuous
+        integration (CI), dashboards and humans match on the code, never the prose. Existing
+        codes are never renumbered.</p>
     </div>
 
     <div class="diags">
@@ -735,7 +736,7 @@ the system.</code></pre>
       </details>
 
       <details>
-        <summary>Why LGPL-3.0?</summary>
+        <summary>Why the LGPL (Lesser General Public License)?</summary>
         <div class="answer">Copyleft on FastPDLC itself, so improvements to the engine come
           back. It's the <em>lesser</em> GPL deliberately: importing it as a library, or running
           it in your CI, does not make your project LGPL. Your product artifacts and your
@@ -779,7 +780,7 @@ the system.</code></pre>
   <div class="wrap">
     <div class="footer-grid">
       <div>
-        <a class="logo" href="/" aria-label="FastPDLC home"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FASTPDLC</span></a>
+        <a class="logo" href="/" aria-label="FastPDLC home"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FastPDLC</span></a>
         <p class="footer-blurb">Product-as-code as a validated graph — for any project.
           Typed artifacts in, a compiled bundle out, and a CI gate in between.</p>
       </div>

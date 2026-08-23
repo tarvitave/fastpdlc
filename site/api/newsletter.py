@@ -260,7 +260,7 @@ def email_html(subject: str, body_md: str, unsubscribe_url: str) -> str:
   <tr><td style="padding-bottom:24px">
     <span style="display:inline-block;background:#191919;color:#ffffff;padding:8px 14px;
                  border-radius:10px;font-family:Arial Black,Arial,sans-serif;
-                 font-size:18px;letter-spacing:0.5px">FASTPDLC</span>
+                 font-size:18px;letter-spacing:0.5px">FastPDLC</span>
   </td></tr>
   <tr><td style="font-family:Helvetica,Arial,sans-serif;color:#191919;
                  font-size:24px;font-weight:bold;line-height:1.25;padding-bottom:18px;
@@ -478,7 +478,7 @@ def _page(title: str, body: str) -> str:
 <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/blog.css">
 </head><body>
 <header class="nav"><div class="wrap nav-inner">
-  <a class="logo" href="/"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FASTPDLC</span></a>
+  <a class="logo" href="/"><svg class="logo-glyph" viewBox="0 0 40 40" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><span class="logo-word">FastPDLC</span></a>
   <nav class="nav-links">
     <a href="/#how">How it works</a><a href="/blog/">Blog</a>
     <a href="/newsletters/">Newsletters</a>

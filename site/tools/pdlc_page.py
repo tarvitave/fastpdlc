@@ -125,11 +125,11 @@ BODY = f"""<main>
     <div class="section-head" style="max-width:52rem">
       <span class="eyebrow">Lifecycle</span>
       <h1 style="font-size:clamp(2.5rem,6vw,4rem);margin-top:0.7rem">One lifecycle, not two.</h1>
-      <p class="lede">Most organisations run a product development lifecycle and a software
-        development lifecycle side by side, connected by meetings. The SDLC has been mechanised
-        for thirty years &mdash; compilers, type checkers, tests, CI. The PDLC has almost none of
-        it. FastPDLC puts both in the same repository, behind the same gate, with the same
-        evidence trail.</p>
+      <p class="lede">Most organisations run a <strong>product development lifecycle (PDLC)</strong>
+        and a <strong>software development lifecycle (SDLC)</strong> side by side, connected by
+        meetings. The SDLC has been mechanised for thirty years &mdash; compilers, type checkers,
+        tests, continuous integration (CI). The PDLC has almost none of it. FastPDLC puts both in
+        the same repository, behind the same gate, with the same evidence trail.</p>
     </div>
 
     <div class="card" style="padding:1.6rem 1.4rem;overflow-x:auto">
@@ -251,7 +251,7 @@ BODY = f"""<main>
         <div class="tl-time">02</div>
         <div>
           <h3>The control is the gate</h3>
-          <p><code>fastpdlc validate</code> runs on every pull request and its exit code decides
+          <p><code>fastpdlc validate</code> runs on every pull request (PR) and its exit code decides
             whether the change merges. That is a control with an enforcement mechanism, not a
             policy document asking people to be careful.</p>
         </div>
