@@ -4,11 +4,19 @@
 # needs a ONE-TIME setup on PyPI (see RELEASING.md): add a trusted publisher for
 # project `fastpdlc`, owner `tarvitave`, repo `fastpdlc`, workflow `publish.yml`,
 # environment `pypi`. After that, cutting a Release ships the version on the tag.
+#
+# workflow_dispatch is a manual fallback: `gh workflow run publish.yml -f version=X.Y.Z`
+# publishes the current main (its pyproject version must equal the input).
 name: publish
 
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish — must equal pyproject.toml (e.g. 0.1.0)"
+        required: true
 
 permissions:
   contents: read
@@ -29,14 +37,18 @@ jobs:
           python -m pip install --upgrade build
           python -m build
 
-      - name: Release tag must match the package version
-        # A mismatched tag would publish a surprise version — fail loudly instead.
+      - name: Requested version must match the package version
+        # A mismatch would publish a surprise version — fail loudly instead.
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            want="${GITHUB_REF_NAME#v}"
+          else
+            want="${{ github.event.inputs.version }}"; want="${want#v}"
+          fi
           pkg="$(ls dist/*.whl | sed -E 's/.*fastpdlc-([0-9][^-]*)-.*/\1/')"
-          echo "release tag=$tag  package=$pkg"
-          test "$tag" = "$pkg" || { echo "::error::tag ($tag) != package version ($pkg)"; exit 1; }
+          echo "requested=$want  package=$pkg  (event=${{ github.event_name }})"
+          test "$want" = "$pkg" || { echo "::error::requested ($want) != package version ($pkg)"; exit 1; }
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
