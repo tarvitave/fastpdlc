@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: tarvitave/fastpdlc@v0.1.0</code></pre>
+      - uses: tarvitave/fastpdlc@v0.2.0</code></pre>
 <p>Commit the bundle alongside the artifacts. That is what makes staleness detectable.</p>
 <h2>Now break it on purpose</h2>
 <p>Worth five minutes: rename <code>TERM-ledger</code> and push. Watch <code>PAC-020</code> name the file that still references the old id. Delete a required field and watch <code>PAC-001</code>. Edit the committed bundle by hand and watch <code>PAC-060</code>.</p>

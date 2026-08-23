@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: tarvitave/fastpdlc@v0.1.0
+      - uses: tarvitave/fastpdlc@v0.2.0
 ```
 
 Commit the bundle alongside the artifacts. That is what makes staleness detectable.

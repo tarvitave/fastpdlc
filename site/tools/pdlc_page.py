@@ -135,6 +135,14 @@ BODY = f"""<main>
     <div class="card" style="padding:1.6rem 1.4rem;overflow-x:auto">
       {diagram()}
     </div>
+
+    <p class="muted" style="margin-top:1rem;font-size:0.92rem;max-width:52rem">
+      <strong>What ships today:</strong> <code style="font-family:var(--mono)">fastpdlc
+      orchestrate</code> runs ST-01 to ST-06, and <code style="font-family:var(--mono)">fastpdlc
+      validate</code> is ST-08. Assembling a pull request (ST-07) and reading production
+      back into intent (ST-10) are your pipeline's job &mdash; the library has no git,
+      no network and no way to merge, by design.
+    </p>
   </div>
 </section>
 

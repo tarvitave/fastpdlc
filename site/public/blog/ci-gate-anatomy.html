@@ -57,7 +57,7 @@
 <p>Never renumber a code. Retire it and add a new one.</p>
 <h2>One command</h2>
 <pre><code>- uses: actions/checkout@v4
-- uses: tarvitave/fastpdlc@v0.1.0</code></pre>
+- uses: tarvitave/fastpdlc@v0.2.0</code></pre>
 <p>The gate should be a single step with no bespoke scripting around it. Every line of glue in a workflow file is a line that rots, and a gate that requires maintenance is a gate that gets deleted during the next CI cleanup.</p>
 <h2>Failing well</h2>
 <p>A good failure names the code, the file, and the specific value that is wrong. A reader should be able to fix it without opening the tool&#x27;s documentation:</p>
