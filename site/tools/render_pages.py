@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from render_blog import page  # noqa: E402  (shared chrome: nav, footer, head)
+from pdlc_page import BODY as PDLC_BODY  # noqa: E402
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "public"
 UPDATED = "23 August 2026"
@@ -277,6 +278,13 @@ PAGES["contact.html"] = (
     <p style="margin-top:2.6rem"><a class="btn" href="/">Back to the front page</a></p>
   </div>
 </main>""")
+
+
+PAGES["lifecycle.html"] = (
+    "One lifecycle, not two — FastPDLC",
+    "PDLC and SDLC in one repository, behind one gate, with a reproducible audit trail. "
+    "Checks on every edge where product intent fans out into code, tests and docs.",
+    PDLC_BODY)
 
 
 def main() -> int:
