@@ -24,6 +24,7 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import json
+import pathlib
 from typing import Any, Callable, Protocol
 
 # ── the roster ───────────────────────────────────────────────────────────────
@@ -222,6 +223,57 @@ class RunReport:
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False, sort_keys=True) + "\n"
 
 
+
+# ── the human gate, as a file ────────────────────────────────────────────────
+# pharthing parks pending questions in a console (POST .../disambiguations, a human
+# answers at /orchestration, run 2 reads the resolved record). That needs a service.
+# A library cannot assume one, so the same two-phase gate is a file on disk: run 1
+# writes the questions with empty answers, a person fills them in, run 2 reads them.
+# Same property -- the line stops until a human has answered -- with nothing to host.
+def disambiguation_path(root: str | pathlib.Path, feature: str) -> pathlib.Path:
+    return pathlib.Path(root) / ".fastpdlc" / "disambiguations" / f"{feature}.json"
+
+
+def write_questions(root: str | pathlib.Path, feature: str, questions: list[dict]) -> pathlib.Path:
+    path = disambiguation_path(root, feature)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = read_resolutions(root, feature)
+    payload = {
+        "feature": feature,
+        "status": "pending",
+        "instructions": "Fill in every \"answer\". Re-run orchestrate when done.",
+        "questions": [
+            {
+                "id": q.get("id") or f"q{i + 1}",
+                "dimension": q.get("dimension", ""),
+                "question": q.get("question", ""),
+                "answer": existing.get(q.get("id") or f"q{i + 1}", ""),
+            }
+            for i, q in enumerate(questions)
+        ],
+    }
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8", newline="\n")
+    return path
+
+
+def read_resolutions(root: str | pathlib.Path, feature: str) -> dict[str, str]:
+    """Answers a human has written into the file. Missing or malformed reads empty."""
+    path = disambiguation_path(root, feature)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for q in payload.get("questions", []):
+        answer = (q.get("answer") or "").strip()
+        if answer:
+            out[q.get("id", "")] = answer
+            if q.get("dimension"):
+                out[q["dimension"]] = answer
+    return out
+
+
 # ── the runner seam ──────────────────────────────────────────────────────────
 class Runner(Protocol):
     """What a station needs to do its work.
@@ -297,11 +349,15 @@ class Orchestrator:
     def __init__(self, runner: Runner, brief: str = "", *,
                  resolutions: dict[str, str] | None = None,
                  max_repair: int | None = None,
+                 extra_lens: Callable[[str], dict] | None = None,
                  on_phase: Callable[[str], None] | None = None):
         self.runner = runner
         self.brief = brief
         self.resolutions = resolutions or {}
         self.max_repair = self.MAX_REPAIR if max_repair is None else max_repair
+        # A critic from a different provider, so it cannot share the builder's blind
+        # spots. Joins the SAME refute/repair logic as the native lenses.
+        self.extra_lens = extra_lens
         self.on_phase = on_phase or (lambda _phase: None)
 
     # ── individual stations ──────────────────────────────────────────────
@@ -404,9 +460,19 @@ class Orchestrator:
                 return Verdict.from_dict(step.data, lens)
             return task
 
-        raw = _fanout([make(lens, ask) for lens, ask in LENSES])
+        tasks: list[Callable[[], Verdict]] = [make(lens, ask) for lens, ask in LENSES]
+        names = [lens for lens, _ in LENSES]
+
+        if self.extra_lens is not None:
+            def cross() -> Verdict:
+                data = self.extra_lens(context)
+                return Verdict.from_dict(data, data.get("lens", "cross-provider"))
+            tasks.append(cross)
+            names.append("cross-provider")
+
+        raw = _fanout(tasks, workers=len(tasks))
         out: list[Verdict] = []
-        for (lens, _ask), result in zip(LENSES, raw):
+        for lens, result in zip(names, raw):
             if isinstance(result, Verdict):
                 out.append(result)
             else:

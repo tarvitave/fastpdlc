@@ -45,6 +45,10 @@ def _build_parser() -> argparse.ArgumentParser:
                      help="answer a Disambiguate question (repeatable)")
     orc.add_argument("--max-repair", type=int, default=None,
                      help=f"bounded repair rounds (default {orchestration.Orchestrator.MAX_REPAIR})")
+    orc.add_argument("--write", action="store_true",
+                     help="let the Develop station actually edit files (default: propose only)")
+    orc.add_argument("--cross-provider", action="store_true",
+                     help="add a non-Claude critic via OpenRouter (needs OPENROUTER_API_KEY)")
     orc.add_argument("-o", "--output", default=None,
                      help="write the run report here instead of stdout")
     return p
@@ -72,8 +76,25 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             runner = orchestration.StubRunner()
         else:
-            from .runners import ClaudeRunner
-            runner = ClaudeRunner()
+            # Develop needs tools; every other station is one structured call.
+            from .coding import CodingRunner
+            runner = CodingRunner(root=args.root, write=args.write)
+
+        extra_lens = None
+        if args.cross_provider:
+            from .runners import CrossProviderLens
+            lens = CrossProviderLens()
+            if not lens.enabled:
+                print("cross-provider lens skipped: OPENROUTER_API_KEY not set",
+                      file=sys.stderr)
+            else:
+                extra_lens = lens.verdict
+
+        # The human gate as a file: answers a person has already written win over
+        # anything passed on the command line only where the flag is absent.
+        stored = orchestration.read_resolutions(args.root, args.feature)
+        stored.update(resolutions)
+        resolutions = stored
 
         try:
             bundle = engine.load(config, args.root)
@@ -84,9 +105,16 @@ def main(argv: list[str] | None = None) -> int:
 
         report = orchestration.Orchestrator(
             runner, brief=brief, resolutions=resolutions,
-            max_repair=args.max_repair,
+            max_repair=args.max_repair, extra_lens=extra_lens,
             on_phase=lambda phase: print(f"── {phase}", file=sys.stderr),
         ).run(args.feature)
+
+        if report.status == "blocked":
+            path = orchestration.write_questions(
+                args.root, args.feature, report.disambiguation)
+            print(f"\nHuman gate: {len(report.disambiguation)} open question(s).",
+                  file=sys.stderr)
+            print(f"Answer them in {path}, then run this again.", file=sys.stderr)
 
         text = report.render()
         if args.output:

@@ -74,18 +74,62 @@ coverage, security, reproduce** — each defaulting to *refuted* unless convince
 blocking verdict feeds back to a repair round; after `--max-repair` rounds the run
 reports honestly rather than proposing.
 
-Two properties are structural, not configurable:
+### The human gate
 
-- **Disambiguate blocks.** Open questions stop the line *before* design, because
-  building the wrong thing correctly is the expensive failure. Answer them with
-  `--resolve q1="from settlement"` and re-run.
+Open questions stop the line *before* design — building the wrong thing correctly is
+the expensive failure. A blocking human gate cannot live inside one autonomous run,
+so it is two-phase: run 1 writes the questions to
+`.fastpdlc/disambiguations/<id>.json` and stops, a person fills in each `answer`,
+run 2 reads them and proceeds.
+
+```json
+{
+  "status": "pending",
+  "questions": [
+    { "id": "q1", "dimension": "refund window start",
+      "question": "From authorization, settlement or delivery?", "answer": "" }
+  ]
+}
+```
+
+`--resolve q1="from settlement"` does the same thing inline for one-offs.
+
+### Writing code
+
+`Develop` is the only station that needs tools, so it runs a bounded loop with three
+of them — list, read, write — confined to the project root. Absolute paths, `..` and
+symlink escapes are refused, not sanitised; there is no shell, no network, and no
+delete.
+
+```bash
+fastpdlc orchestrate FEAT-refunds            # proposes a diff, writes nothing
+fastpdlc orchestrate FEAT-refunds --write    # lets it edit your working tree
+```
+
+`--write` is opt-in on purpose. Run it on a clean branch.
+
+### A critic that does not share the builder's blind spots
+
+```bash
+OPENROUTER_API_KEY=... fastpdlc orchestrate FEAT-refunds --cross-provider
+```
+
+Adds a fifth verdict from a non-Claude model, joining the same refute/repair logic.
+Diversity is a correctness lever: a critic from the same family can share the
+builder's failure modes. Without the key the lens is skipped and the run is
+identical to native-only; if the call fails it abstains rather than blocking.
+
+### What is structural
+
 - **Nothing merges.** The orchestrator's terminal state is a report. `validate` is
-  the judge, and a human decides. Every station past the gate is deterministic or
-  human by construction.
+  the judge and a human decides; every station past the gate is deterministic or
+  human by construction, and a test asserts it.
+- **Minor findings do not block.** A gate that fires on nitpicks trains people to
+  bypass it, and a bypassed gate is worse than none.
+- **An unreachable critic abstains.** One flaky provider must not become an outage.
 
 Control flow is ordinary code; reasoning lives inside a station. Supply your own
-`Runner` to change what a station does — writing code is a tool-using agent's job,
-and the seam is there for it.
+`Runner` to change what any station does.
 
 ## Evidence
 

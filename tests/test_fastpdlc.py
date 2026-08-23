@@ -384,3 +384,122 @@ def test_the_orchestrator_cannot_merge_anything():
     for sid in ("ST-07", "ST-08", "ST-09", "ST-10"):
         assert orchestration.BY_ID[sid].kind != orchestration.AGENT
     assert orchestration.BY_ID["ST-09"].kind == orchestration.HUMAN
+
+
+# ── the coding sandbox ───────────────────────────────────────────────────────
+def test_sandbox_refuses_escape_attempts(tmp_path):
+    """A model is driving this. Containment is checked after resolution, so `..`,
+    absolute paths and symlinks are refused rather than sanitised."""
+    from fastpdlc.coding import PathOutsideRoot, Sandbox
+
+    root = tmp_path / "project"
+    (root / "src").mkdir(parents=True)
+    (root / "src" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("do not read me\n", encoding="utf-8")
+
+    box = Sandbox(root, write=True)
+    assert box.read_file("src/a.py") == "x = 1\n"
+
+    for escape in ["../secret.txt", "src/../../secret.txt", "src/../..",
+                   str(tmp_path / "secret.txt")]:
+        with pytest.raises(PathOutsideRoot):
+            box.resolve(escape)
+
+
+def test_sandbox_dry_run_records_but_does_not_write(tmp_path):
+    from fastpdlc.coding import Sandbox
+
+    root = tmp_path / "project"
+    root.mkdir()
+    box = Sandbox(root, write=False)
+    box.write_file("new.py", "print('hi')\n")
+
+    assert box.written == ["new.py"]
+    assert not (root / "new.py").exists()          # proposed, not applied
+
+
+def test_sandbox_writes_when_enabled(tmp_path):
+    from fastpdlc.coding import Sandbox
+
+    root = tmp_path / "project"
+    root.mkdir()
+    box = Sandbox(root, write=True)
+    box.write_file("pkg/new.py", "print('hi')\n")
+
+    assert (root / "pkg" / "new.py").read_text(encoding="utf-8") == "print('hi')\n"
+
+
+# ── the cross-provider adversary ─────────────────────────────────────────────
+def test_cross_provider_lens_is_skipped_without_a_key(monkeypatch):
+    from fastpdlc.runners import CROSS_PROVIDER_LENS, CrossProviderLens
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    lens = CrossProviderLens()
+    assert lens.enabled is False
+
+    verdict = lens.verdict("context")
+    assert verdict["lens"] == CROSS_PROVIDER_LENS
+    assert verdict["refuted"] is False              # abstains, never blocks
+
+
+def test_cross_provider_lens_abstains_when_the_call_fails(monkeypatch):
+    """A diverse critic that cannot be reached must not take down the line."""
+    import urllib.request
+
+    from fastpdlc.runners import CrossProviderLens
+
+    def boom(*a, **kw):
+        raise OSError("network unreachable")
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    lens = CrossProviderLens(api_key="test-key")
+    assert lens.enabled is True
+
+    verdict = lens.verdict("context")
+    assert verdict["refuted"] is False
+    assert "inconclusive" in verdict["reason"]
+
+
+def test_cross_provider_verdict_joins_the_refute_logic():
+    """When the diverse critic refutes, it blocks exactly like a native lens."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    def refusing_lens(context: str) -> dict:
+        return {"lens": "cross-provider(openrouter)", "refuted": True,
+                "severity": "blocker", "reason": "authz missing on the money path",
+                "failing_case": "unauthenticated refund"}
+
+    report = Orchestrator(StubRunner(), extra_lens=refusing_lens,
+                          max_repair=1).run("FEAT-refunds")
+
+    assert len(report.verdicts) == 5                      # four native + one diverse
+    assert report.status == "refuted"
+    assert report.repair_rounds == 1
+    assert [v.lens for v in report.blocking] == ["cross-provider(openrouter)"]
+
+
+# ── the human gate as a file ─────────────────────────────────────────────────
+def test_disambiguation_file_is_the_two_phase_gate(tmp_path):
+    """pharthing parks these in a console; a library cannot assume a service, so the
+    same gate is a file. Run 1 blocks and writes it, a human answers, run 2 proceeds."""
+    from fastpdlc.orchestration import (Orchestrator, StubRunner, read_resolutions,
+                                        write_questions)
+
+    questions = [{"id": "q1", "dimension": "refund window start", "question": "?"}]
+
+    first = Orchestrator(StubRunner(questions=questions)).run("FEAT-refunds")
+    assert first.status == "blocked"
+
+    path = write_questions(tmp_path, "FEAT-refunds", first.disambiguation)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["status"] == "pending"
+    assert payload["questions"][0]["answer"] == ""        # waiting on a person
+
+    payload["questions"][0]["answer"] = "from settlement"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    second = Orchestrator(StubRunner(questions=questions),
+                          resolutions=read_resolutions(tmp_path, "FEAT-refunds")
+                          ).run("FEAT-refunds")
+    assert second.status == "proposed"
+    assert "ST-03" in [s.station for s in second.steps]
