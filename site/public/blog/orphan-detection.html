@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finding the artifacts nobody references — FastPDLC</title>
+<meta name="description" content="A graph makes absence visible. Orphans are usually either dead weight or a missing link, and both are worth knowing about.">
+<link rel="canonical" href="https://fastpdlc.com/blog/orphan-detection.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Finding the artifacts nobody references — FastPDLC">
+<meta property="og:description" content="A graph makes absence visible. Orphans are usually either dead weight or a missing link, and both are worth knowing about.">
+<meta property="og:url" content="https://fastpdlc.com/blog/orphan-detection.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23191919'/><text x='50' y='72' font-family='Arial Narrow,Impact,sans-serif' font-size='62' font-weight='900' fill='%23fbcc00' text-anchor='middle'>F</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/blog.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Finding the artifacts nobody references", "description": "A graph makes absence visible. Orphans are usually either dead weight or a missing link, and both are worth knowing about.", "datePublished": "2026-06-10", "author": {"@type": "Organization", "name": "FastPDLC"}, "url": "https://fastpdlc.com/blog/orphan-detection.html"}</script>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+    <nav class="nav-links" id="navLinks">
+      <a href="/#how">How it works</a>
+      <a href="/#diagnostics">Diagnostics</a>
+      <a href="/blog/">Blog</a>
+      <a href="/#faq">FAQ</a>
+      <a href="https://github.com/tarvitave/fastpdlc">GitHub</a>
+      <a class="btn btn-primary nav-cta" href="/#start">Get started</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="section post">
+  <div class="wrap post-wrap">
+    <a class="back-link" href="/blog/">&larr; All posts</a>
+    <span class="badge" style="background:#00b67a;color:#fff">practice</span>
+    <h1>Finding the artifacts nobody references</h1>
+    <p class="lede post-summary">A graph makes absence visible. Orphans are usually either dead weight or a missing link, and both are worth knowing about.</p>
+    <div class="post-meta">10 June 2026 &middot; 3 min read
+      &middot; FastPDLC</div>
+    <div class="post-body">
+      <p><code>PAC-020</code> catches references pointing at nothing. The mirror-image question is just as useful and nobody asks it: which artifacts does <em>nothing</em> point at?</p>
+<h2>Two kinds of orphan</h2>
+<p>An orphaned term is either:</p>
+<p><strong>Dead weight.</strong> A concept that mattered once, was superseded, and never removed. It still appears in the glossary, still gets read, and still shapes how newcomers think about the domain -- inaccurately.</p>
+<p><strong>A missing link.</strong> A concept that genuinely matters but that no rule or feature declares a dependency on, which usually means the graph is under-connected rather than the term being useless.</p>
+<p>Both are worth surfacing. Neither should fail the build, because a brand-new term is legitimately unreferenced for a while.</p>
+<h2>A warning, not an error</h2>
+<p>This is what warning severity is for:</p>
+<pre><code>@reg.validator
+def orphan_terms(bundle, config, root, report):
+    referenced = {
+        t for term in bundle[&quot;terms&quot;] for t in (term.get(&quot;see_also&quot;) or [])
+    } | {
+        t for rule in bundle[&quot;rules&quot;] for t in (rule.get(&quot;mentions&quot;) or [])
+    }
+    for term in bundle[&quot;terms&quot;]:
+        if term[&quot;id&quot;] not in referenced:
+            report.add(&quot;PAC-901&quot;, &quot;term is referenced by nothing&quot;,
+                       term[&quot;_file&quot;], severity=&quot;warning&quot;)</code></pre>
+<p>Warnings print and do not gate. Review them periodically rather than reacting to each one -- an orphan is a question, not a defect.</p>
+<h2>The report as a health metric</h2>
+<p>Track the orphan count over time. A slowly rising number means the model is accumulating vocabulary faster than it is connecting it, which is the leading indicator of a glossary drifting back into being a list of words.</p>
+<p>A sudden drop usually means someone deleted rather than retired something. Worth a look.</p>
+<h2>Other absence checks worth writing</h2>
+<p>Once you have the pattern, the family is obvious: rules with no feature implementing them, features implementing no rule, decisions affecting nothing, terms defined but never used in any body text.</p>
+<p>Each is a few lines in a validator. Each answers a question that is unanswerable against prose, and each tends to find something the first time you run it.</p>
+    </div>
+    <div class="related"><h3>Related</h3><ul><li><a href="/blog/plugins-deep-dive.html">Extending the validator with plugins</a></li><li><a href="/blog/dangling-references.html">What a dangling reference actually costs</a></li></ul></div>
+  </div>
+</article>
+<section class="section band-cream">
+  <div class="wrap cta">
+    <span class="eyebrow">Newsletter</span>
+    <h2 style="margin-top:0.8rem">Get the next one by email.</h2>
+    <p class="lede" style="max-width:38rem;margin:1rem auto 0">Short notes on product-as-code,
+      new diagnostic codes, and what breaks in real repositories. Twice a week, unsubscribe in one click.</p>
+    <form class="signup" id="signupForm" novalidate>
+      <div class="signup-row">
+        <label class="hp" for="company">Company (leave blank)</label>
+        <input class="hp" type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        <label class="hp" for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="email">
+        <button class="btn btn-primary" type="submit">Subscribe</button>
+      </div>
+      <p class="msg" id="signupMsg" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+</main>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="/" aria-label="FastPDLC home"><span class="logo-mark">FASTPDLC</span></a>
+        <p class="footer-blurb">Product-as-code as a validated graph &mdash; for any project.
+          Typed artifacts in, a compiled bundle out, and a CI gate in between.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/#diagnostics">Diagnostic codes</a></li>
+          <li><a href="/blog/">Blog</a></li>
+          <li><a href="/newsletters/">Newsletters</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/who-we-are.html">Who we are</a></li>
+          <li><a href="/contact.html">Contact us</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc">GitHub</a></li>
+          <li><a href="https://pypi.org/project/fastpdlc/">PyPI</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/privacy.html">Privacy policy</a></li>
+          <li><a href="/terms.html">Terms of use</a></li>
+          <li><a href="/sms-opt-in.html">SMS opt-in</a></li>
+          <li><a href="https://github.com/tarvitave/fastpdlc/blob/main/LICENSE">LGPL-3.0-or-later</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-base">
+      <span>&copy; <span id="year">2026</span> FastPDLC. This blog is compiled and validated by FastPDLC itself.</span>
+      <span><code style="font-family:var(--mono)">pip install fastpdlc</code></span>
+    </div>
+  </div>
+</footer>
+<script src="/main.js" defer></script>
+</body>
+</html>

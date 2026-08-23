@@ -30,6 +30,15 @@ www.{$SITE_DOMAIN} {
 		reverse_proxy api:8000
 	}
 
+	# The admin panel. Server-rendered by the API; never cached, never indexed.
+	handle /admin* {
+		reverse_proxy api:8000
+		header {
+			Cache-Control "no-store"
+			X-Robots-Tag  "noindex, nofollow"
+		}
+	}
+
 	# ── self-hosted analytics, only routed when the profile is running ───
 	# Serving it from our own origin means no third-party requests and no
 	# ad-blocker breakage. Remove this block if you don't run the profile.

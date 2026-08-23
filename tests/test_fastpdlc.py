@@ -1,6 +1,7 @@
 """Tests for the FastPDLC engine: schema/id/reference/enum/staleness + the plugin API."""
 from __future__ import annotations
 
+import json
 import pathlib
 import sys
 
@@ -135,3 +136,32 @@ def test_plugin_validator_and_transformer_and_output(tmp_path):
     (tmp_path / "build" / "catalogue.json").write_text("stale\n")
     codes = _codes(validate(cfg, tmp_path, reg))
     assert "PAC-900" in codes and "PAC-060" in codes
+
+
+def test_dates_in_frontmatter_serialize_to_iso(tmp_path):
+    """YAML turns an unquoted 2026-02-04 into datetime.date; the bundle must still
+    build, emitting ISO-8601 rather than blowing up in json.dumps."""
+    (tmp_path / "product" / "posts").mkdir(parents=True)
+    (tmp_path / "product" / "posts" / "POST-hello.md").write_text(
+        "---\nid: POST-hello\ntitle: Hello\ndate: 2026-02-04\n---\nBody.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "product.config.yaml").write_text(
+        "product_dir: product\n"
+        "output: build/out.json\n"
+        "types:\n"
+        "  - name: posts\n"
+        "    dir: posts\n"
+        "    id_prefix: 'POST-'\n"
+        "    required: [id, title, date]\n"
+        "    fields: [title, date]\n",
+        encoding="utf-8",
+    )
+    from fastpdlc import engine
+    from fastpdlc.config import load_config
+
+    config = load_config(str(tmp_path / "product.config.yaml"))
+    engine.build(config, str(tmp_path))
+    bundle = json.loads((tmp_path / "build" / "out.json").read_text(encoding="utf-8"))
+    assert bundle["posts"][0]["date"] == "2026-02-04"
+    assert engine.validate(config, str(tmp_path)).ok

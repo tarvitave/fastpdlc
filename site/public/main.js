@@ -129,6 +129,72 @@
     });
   }
 
+
+  /* ── contact form ─────────────────────────────────────────────────────── */
+  var contact = document.getElementById('contactForm');
+  var cmsg = document.getElementById('contactMsg');
+  if (contact && cmsg) {
+    contact.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        name: contact.name.value.trim(),
+        email: contact.email.value.trim(),
+        subject: contact.subject.value,
+        message: contact.message.value.trim(),
+        website: contact.website.value
+      };
+      cmsg.className = 'msg';
+      if (!payload.name || !payload.message || payload.email.indexOf('@') < 1) {
+        cmsg.textContent = 'Please fill in your name, a valid email, and a message.';
+        cmsg.classList.add('err');
+        return;
+      }
+      var btn = contact.querySelector('button[type=submit]');
+      btn.disabled = true;
+      cmsg.textContent = 'Sending…';
+      fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function () {
+          contact.reset();
+          cmsg.textContent = 'Thanks — we have it, and we will come back to you.';
+          cmsg.classList.add('ok');
+        })
+        .catch(function () {
+          cmsg.textContent = "Couldn't send that. Try again, or open a GitHub issue.";
+          cmsg.classList.add('err');
+        })
+        .finally(function () { btn.disabled = false; });
+    });
+  }
+
+  /* ── first-party analytics beacon ─────────────────────────────────────────
+     No cookies and no stored IP; the server derives a daily-rotating hash purely
+     to count uniques. Respects Do Not Track, and never blocks rendering. */
+  (function () {
+    if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return;
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+    var payload = JSON.stringify({
+      path: location.pathname,
+      referrer: document.referrer || ''
+    });
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/track', new Blob([payload], { type: 'application/json' }));
+      } else {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true
+        }).catch(function () {});
+      }
+    } catch (e) { /* analytics must never break the page */ }
+  })();
+
   /* ── footer year ──────────────────────────────────────────────────────── */
   var year = document.getElementById('year');
   if (year) year.textContent = String(new Date().getFullYear());

@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY *.py ./
 
 # Runs unprivileged. /data must exist in the IMAGE and be owned by appuser:
 # Docker seeds an empty named volume from the image path, ownership included.
