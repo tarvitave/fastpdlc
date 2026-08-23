@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>FastPDLC — LinkedIn carousel</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:#191919; --yel:#fbcc00; --grn:#00b67a; --ora:#ff6b4a;
+    --blu:#4a90e2; --pur:#b47cff; --crm:#fff9e6; --grid:#e5e5e5;
+    --mono:'IBM Plex Mono',monospace; --disp:'Anton',Impact,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:#6b6b6b;font-family:'IBM Plex Sans',sans-serif;color:var(--ink)}
+
+  .slide{
+    position:relative; width:1080px; height:1350px; overflow:hidden;
+    margin:0 auto 28px; display:flex; flex-direction:column;
+    background-image:radial-gradient(var(--grid) 3px, transparent 3px);
+    background-size:48px 48px;
+  }
+  .slide.plain{background-image:none}
+  .slide[style*="#191919"]{color:#fff;background-image:radial-gradient(#333 3px,transparent 3px)}
+  .slide[style*="#191919"] h1,.slide[style*="#191919"] h2{color:#fff}
+  .slide[style*="#191919"] .lede{color:#c9c9c9}
+  .slide[style*="#191919"] .eyebrow{color:var(--yel)}
+
+  .pad{flex:1; padding:110px 96px 190px; display:flex; flex-direction:column}
+  .pad.center{justify-content:center; align-items:flex-start}
+
+  .eyebrow{font-family:var(--mono);font-size:26px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;margin-bottom:34px;display:block}
+  h1{font-family:var(--disp);font-size:96px;line-height:1.02;letter-spacing:.5px}
+  h1.huge{font-size:112px}
+  h2{font-family:var(--disp);font-size:82px;line-height:1.04;letter-spacing:.5px;margin-bottom:44px}
+  .lede{font-size:36px;line-height:1.45;max-width:860px;margin-top:34px;color:#333}
+  .kicker{margin-top:auto;font-size:32px;font-weight:600;line-height:1.4;
+    border-top:5px solid var(--ink);padding-top:30px}
+  .slide[style*="#191919"] .kicker{border-color:#444}
+  .hl{background:linear-gradient(transparent 52%, var(--yel) 52%, var(--yel) 90%, transparent 90%);
+    padding-inline:.06em}
+
+  .card{border:6px solid var(--ink);border-radius:22px;box-shadow:14px 14px 0 var(--ink);
+    background:#fff;padding:40px 44px}
+  .mono{font-family:var(--mono);font-size:36px;line-height:1.6}
+  .mono.sm{font-size:24px}
+  .dim{color:#8a8a8a}
+  .strike{color:var(--ora);font-weight:600}
+  .err{color:var(--ora);font-size:30px;font-weight:600;word-break:break-word}
+
+  ul.big{list-style:none;padding:0;margin-top:20px}
+  ul.big li{font-family:var(--disp);font-size:64px;line-height:1.5;letter-spacing:.4px}
+  ul.big li::before{content:'\2715';color:var(--ora);margin-right:26px}
+
+  .flow{display:flex;align-items:center;gap:26px;margin-top:20px}
+  .node{flex:1;min-height:220px;display:flex;flex-direction:column;justify-content:center;
+    text-align:center;font-family:var(--disp);font-size:34px;line-height:1.25;
+    border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);padding:22px}
+  .arrow{font-size:56px;font-weight:700}
+
+  .codes{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .code{border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);
+    padding:32px 30px;min-height:190px;display:flex;flex-direction:column;justify-content:center}
+  .code b{font-family:var(--disp);font-size:52px;letter-spacing:.5px}
+  .code span{font-size:28px;font-weight:600;margin-top:10px}
+
+  .stations{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .st{border:5px solid var(--ink);border-radius:18px;box-shadow:8px 8px 0 var(--ink);
+    background:#fff;padding:24px 26px;font-family:var(--disp);font-size:40px;line-height:1.15}
+  .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:#6b6b6b;
+    letter-spacing:.08em;margin-bottom:6px}
+  .st span{display:block;font-family:'IBM Plex Sans',sans-serif;font-size:23px;
+    font-weight:600;color:#555;margin-top:8px}
+  .st.human{background:#f2f2f2;border-style:dashed}
+  .st.machine{background:var(--yel)}
+
+  .lens-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .lens{border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);
+    padding:32px 30px;min-height:250px;font-size:28px;font-weight:500;line-height:1.35}
+  .lens b{display:block;font-family:var(--mono);font-size:36px;font-weight:600;margin-bottom:16px}
+
+  .cta{margin-top:56px;display:inline-block;background:var(--ink);color:var(--yel);
+    font-size:46px;padding:30px 44px;border-radius:20px}
+  .url{margin-top:auto;padding-top:40px;font-family:var(--disp);font-size:62px;letter-spacing:.5px}
+
+  .foot{position:absolute;left:96px;right:96px;bottom:52px;display:flex;
+    align-items:center;justify-content:space-between}
+  .foot span{display:flex;align-items:center;gap:16px;font-family:var(--disp);
+    font-size:34px;letter-spacing:.3px}
+  .foot .num{font-family:var(--mono);font-size:28px;font-weight:600;color:#8a8a8a}
+  .slide[style*="#191919"] .foot{color:#fff}
+  .mark{width:52px;height:52px}
+
+  /* ── the PDF ─────────────────────────────────────────────────────────────
+     Save as PDF with margins NONE and "Background graphics" ON. */
+  @page{size:1080px 1350px;margin:0}
+  @media print{
+    body{background:#fff}
+    .slide{margin:0;page-break-after:always;break-after:page;box-shadow:none}
+    .slide:last-child{page-break-after:auto;break-after:auto}
+    .note{display:none}
+  }
+  .note{max-width:1080px;margin:26px auto;padding:22px 26px;background:#fff;
+    border:5px solid var(--ink);border-radius:18px;font-size:19px;line-height:1.55}
+  .note b{font-family:var(--disp);font-size:24px;letter-spacing:.3px}
+  .note code{font-family:var(--mono);background:var(--crm);padding:2px 7px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="note">
+  <b>How to post this</b><br>
+  Print this page &rarr; <b>Destination:</b> Save as PDF &rarr; <b>Layout:</b> Portrait
+  &rarr; <b>Margins:</b> None &rarr; tick <b>Background graphics</b>. You get one
+  1080&times;1350 slide per page. On LinkedIn choose <b>Add a document</b>, upload the
+  PDF, and give it a title — the title shows above the carousel, so make it the hook.
+  This page is <code>noindex</code>.
+</div>
+<section class="slide" style="background:#fff">
+  <div class="pad">
+    <span class="eyebrow">Product-as-code</span>
+    <h1>Someone renames one term.</h1>
+    <p class="lede">One file changed. The pull request looks harmless.</p>
+    <div class="card mono" style="margin-top:70px">
+      <div class="dim">- id: TERM-payment</div>
+      <div class="strike">+ id: TERM-charge</div>
+    </div>
+    <p class="kicker">Three other documents still point at the old one.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">01</span></div></section>
+<section class="slide" style="background:#fff9e6">
+  <div class="pad">
+    <h2>Nothing breaks.</h2>
+    <ul class="big">
+      <li>No crash</li>
+      <li>No failing test</li>
+      <li>No review comment</li>
+    </ul>
+    <p class="lede" style="margin-top:60px">Eleven months later, a new engineer reads
+      one of those documents, cannot find the concept, and reconstructs what they
+      think it meant.</p>
+    <p class="kicker">Now there are two meanings in circulation, and nobody can trace
+      where they diverged.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">02</span></div></section>
+<section class="slide" style="background:#fff">
+  <div class="pad center">
+    <h1 class="huge">Your code has a<br><span class="hl">compiler.</span></h1>
+    <h1 class="huge" style="margin-top:40px">Your product model<br>has <span class="hl">hope.</span></h1>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">03</span></div></section>
+<section class="slide" style="background:#fff">
+  <div class="pad">
+    <span class="eyebrow">What FastPDLC does</span>
+    <h2>Typed artifacts, beside your code.</h2>
+    <div class="flow">
+      <div class="node" style="background:#fff9e6">glossary<br>rules<br>features</div>
+      <div class="arrow">&rarr;</div>
+      <div class="node" style="background:#fbcc00">the gate<br><span class="mono sm">fastpdlc<br>validate</span></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node" style="background:#fff">one bundle<br><span class="mono sm">committed<br>byte-stable</span></div>
+    </div>
+    <p class="lede" style="margin-top:60px">Reviewed in the same pull requests. Checked
+      by the same CI. A rename that breaks three references fails the build in seconds
+      — before a reviewer opens it.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">04</span></div></section>
+<section class="slide" style="background:#fff9e6">
+  <div class="pad">
+    <span class="eyebrow">Stable diagnostic codes</span>
+    <h2>Findings are an API.</h2>
+    <div class="codes">
+      <div class="code" style="background:#ff6b4a"><b>PAC-001</b><span>required field</span></div>
+      <div class="code" style="background:#4a90e2"><b>PAC-020</b><span>dangling reference</span></div>
+      <div class="code" style="background:#b47cff"><b>PAC-030</b><span>enum violation</span></div>
+      <div class="code" style="background:#fbcc00"><b>PAC-060</b><span>the committed build is stale</span></div>
+    </div>
+    <p class="kicker">Never renumbered. CI, dashboards and humans match on the code,
+      never the prose.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">05</span></div></section>
+<section class="slide" style="background:#191919">
+  <div class="pad center">
+    <span class="eyebrow">New in 0.2.0</span>
+    <h1 class="huge">A workforce<br>builds it.</h1>
+    <h1 class="huge" style="margin-top:30px">A <span class="hl">gate</span><br>judges it.</h1>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">06</span></div></section>
+<section class="slide" style="background:#fff">
+  <div class="pad">
+    <span class="eyebrow">The line</span>
+    <h2>Six stations, then a judge.</h2>
+    <div class="stations">
+      <div class="st"><b>ST-01</b>Understand</div>
+      <div class="st human"><b>ST-02</b>Disambiguate<span>human gate</span></div>
+      <div class="st"><b>ST-03</b>Design</div>
+      <div class="st"><b>ST-04</b>Develop</div>
+      <div class="st"><b>ST-05</b>Test</div>
+      <div class="st"><b>ST-06</b>Verify</div>
+      <div class="st machine"><b>ST-08</b>CI gates<span>deterministic</span></div>
+      <div class="st human"><b>ST-09</b>Human merge<span>a person decides</span></div>
+    </div>
+    <p class="kicker">Open questions stop the line before design. Building the wrong
+      thing correctly is the expensive failure.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">07</span></div></section>
+<section class="slide" style="background:#fff9e6">
+  <div class="pad">
+    <span class="eyebrow">ST-06 &middot; Verify</span>
+    <h2>Four critics, trying to refute.</h2>
+    <div class="lens-grid">
+      <div class="lens" style="background:#ff6b4a"><b>correctness</b>Find an input where it does the wrong thing.</div>
+      <div class="lens" style="background:#00b67a"><b>coverage</b>Would the test still pass with the feature deleted?</div>
+      <div class="lens" style="background:#4a90e2"><b>security</b>Trust boundaries, authz, spend and consent.</div>
+      <div class="lens" style="background:#b47cff"><b>reproduce</b>Concurrency, partial failure, retries, rollback.</div>
+    </div>
+    <p class="kicker">Each defaults to <b>refuted</b> unless convinced. The agent that
+      built the change never grades it.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">08</span></div></section>
+<section class="slide" style="background:#191919">
+  <div class="pad center">
+    <h1 class="huge">Agents propose.<br>Gates enforce.<br>A human merges.</h1>
+    <p class="lede" style="margin-top:70px;max-width:760px">The gate is never an agent.
+      A judge that could be persuaded could not produce evidence.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">09</span></div></section>
+<section class="slide" style="background:#fff">
+  <div class="pad">
+    <span class="eyebrow">Proof, not a promise</span>
+    <h2>It found a bug in itself.</h2>
+    <p class="lede">The blog on fastpdlc.com is stored as product-as-code — ids matching
+      filenames, categories from an allowed set, every cross-link resolving. So it goes
+      through the same gate as everything else.</p>
+    <div class="card mono" style="margin-top:50px">
+      <div class="err">TypeError: Object of type date is not JSON serializable</div>
+    </div>
+    <p class="kicker">An unquoted date in frontmatter became a Python object the bundle
+      could not serialise. Any project with a date field would have hit it. Fixed in
+      0.2.0, with a regression test.</p>
+  </div><div class="foot"><span><svg viewBox="0 0 40 40" class="mark" aria-hidden="true"><rect x="1.6" y="1.6" width="36.8" height="36.8" rx="9" fill="#191919"/><path d="M10.5 21.5 L17 28 L29.5 12.5" fill="none" stroke="#fbcc00" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.5" cy="21.5" r="3.6" fill="#fff"/><circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg><b>FastPDLC</b></span><span class="num">10</span></div></section>
+<section class="slide" style="background:#fff">
+  <div class="pad center">
+    <h1 class="huge">Your product spec,<br><span class="hl">compiled.</span></h1>
+    <div class="cta mono">pip install fastpdlc</div>
+    <p class="lede" style="margin-top:44px">Two dependencies. No network in the core.
+      LGPL-3.0.</p>
+    <div class="url">fastpdlc.com</div>
+  </div></section>
+</body>
+</html>

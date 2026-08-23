@@ -3,5 +3,6 @@ Allow: /
 Disallow: /api/
 Disallow: /stats/
 Disallow: /og.html
+Disallow: /carousel.html
 
 Sitemap: https://fastpdlc.com/sitemap.xml
