@@ -16,6 +16,11 @@ if [[ -z "$HOST" ]]; then
   exit 2
 fi
 
+echo "→ rebuilding and fingerprinting"
+python tools/render_blog.py
+python tools/render_pages.py
+python tools/fingerprint_assets.py
+
 echo "→ syncing to ${HOST}:${REMOTE_DIR}"
 rsync -az --delete \
   --exclude '.env' \

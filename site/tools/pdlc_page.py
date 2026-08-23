@@ -73,13 +73,15 @@ def diagram() -> str:
              f'fill="#6b6b6b">committed, byte-stable</text>')
 
     # ── fan-out ─────────────────────────────────────────────────────────────
-    targets = [("Code", 40, ORA), ("Tests", 118, GRN), ("Docs site", 196, BLU),
-               ("In-app", 274, PUR), ("LLM context", 352, YEL)]
+    # The fan-out from pharthing's roster -- Document, Roadmap, Operations. An
+    # earlier version of this diagram invented Code/Tests/In-app/LLM-context, which
+    # described a pattern rather than the model this product actually implements.
+    targets = [("Document", 70, BLU), ("Roadmap", 178, PUR), ("Operations", 286, GRN)]
     for label, y, colour in targets:
         p.append(_arrow(815, 185, 930, y + 20))
-        p.append(f'<rect x="940" y="{y + 4}" width="185" height="34" rx="9" fill="{colour}" '
+        p.append(f'<rect x="940" y="{y + 4}" width="200" height="38" rx="9" fill="{colour}" '
                  f'stroke="{INK}" stroke-width="3"/>')
-        p.append(f'<text x="1032" y="{y + 27}" text-anchor="middle" '
+        p.append(f'<text x="1040" y="{y + 29}" text-anchor="middle" '
                  f'font-family="Anton, Impact, sans-serif" font-size="16" fill="{INK}">{label}</text>')
 
     # The fan-out legend sits under the bundle, clear of the arrows -- placing it
