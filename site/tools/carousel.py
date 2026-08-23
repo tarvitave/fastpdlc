@@ -5,6 +5,9 @@ are HTML in the site's own system and the PDF comes from the browser's print
 dialogue — so the carousel cannot drift from the brand, and editing a line is
 editing a string.
 
+The station faces are imported from `stations.py`, not redrawn, so the carousel and
+the homepage rail can never disagree about what an agent looks like.
+
 Slides are 1080x1350 (4:5), which is what LinkedIn crops to on mobile. `@page`
 matches exactly and every slide is its own page, so "Save as PDF" with margins off
 and background graphics on gives one slide per page with no bleed.
@@ -14,11 +17,17 @@ and background graphics on gives one slide per page with no bleed.
 from __future__ import annotations
 
 import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from stations import STATIONS, avatar  # noqa: E402  (one source for the faces)
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "public" / "carousel.html"
 
-INK, YEL, GRN, ORA, BLU, PUR, CRM = (
-    "#191919", "#fbcc00", "#00b67a", "#ff6b4a", "#4a90e2", "#b47cff", "#fff9e6")
+# the site's palette, verbatim
+INK, PAPER, YEL = "#191919", "#ffffff", "#fbcc00"
+GRN, ORA, BLU, PUR, PNK, RED, CRM = (
+    "#00b67a", "#ff6b4a", "#4a90e2", "#b47cff", "#ff8fd0", "#8b1538", "#fff9e6")
 
 LOGO = (
     '<svg viewBox="0 0 40 40" class="mark" aria-hidden="true">'
@@ -29,116 +38,114 @@ LOGO = (
     '<circle cx="29.5" cy="12.5" r="3.6" fill="#00b67a"/></svg>')
 
 
-def slide(n: int, body: str, *, bg: str = "#fff", dots: bool = True,
+def slide(n: int, body: str, *, bg: str = PAPER, dark: bool = False,
           footer: bool = True) -> str:
-    cls = "slide" + (" plain" if not dots else "")
-    foot = (f'<div class="foot"><span>{LOGO}<b>FastPDLC</b></span>'
+    cls = "slide" + (" dark" if dark else "")
+    foot = (f'<div class="foot"><span class="fmark">{LOGO}<b>FastPDLC</b></span>'
             f'<span class="num">{n:02d}</span></div>') if footer else ""
-    return f'<section class="{cls}" style="background:{bg}">{body}{foot}</section>'
+    return f'<section class="{cls}" style="--bg:{bg}">{body}{foot}</section>'
+
+
+def station_card(index: int) -> str:
+    s = STATIONS[index]
+    kind = {"agent": "agent", "human": "human", "machine": "deterministic"}[s["kind"]]
+    return f"""<div class="stn" data-kind="{s['kind']}">
+      {avatar(s, index)}
+      <div class="stn-t"><b>{s['id']}</b>{s['name']}</div>
+      <span class="chip">{kind}</span>
+    </div>"""
 
 
 SLIDES: list[str] = []
 
-# 1 — the hook
+# ── 1 · the hook ─────────────────────────────────────────────────────────────
 SLIDES.append(slide(1, f"""
   <div class="pad">
     <span class="eyebrow">Product-as-code</span>
-    <h1>Someone renames one term.</h1>
-    <p class="lede">One file changed. The pull request looks harmless.</p>
-    <div class="card mono" style="margin-top:70px">
+    <h1 class="mega">Someone<br>renames<br>one <span class="hl">term.</span></h1>
+    <div class="card mono shadow-xl" style="margin-top:64px">
       <div class="dim">- id: TERM-payment</div>
-      <div class="strike">+ id: TERM-charge</div>
+      <div class="add">+ id: TERM-charge</div>
     </div>
-    <p class="kicker">Three other documents still point at the old one.</p>
+    <p class="kicker">One file changed. Three other documents still point at the old one.</p>
   </div>"""))
 
-# 2 — the silent failure
+# ── 2 · the silent failure ───────────────────────────────────────────────────
 SLIDES.append(slide(2, """
   <div class="pad">
-    <h2>Nothing breaks.</h2>
-    <ul class="big">
-      <li>No crash</li>
-      <li>No failing test</li>
-      <li>No review comment</li>
-    </ul>
-    <p class="lede" style="margin-top:60px">Eleven months later, a new engineer reads
-      one of those documents, cannot find the concept, and reconstructs what they
-      think it meant.</p>
-    <p class="kicker">Now there are two meanings in circulation, and nobody can trace
-      where they diverged.</p>
-  </div>""", bg=CRM))
-
-# 3 — the asymmetry
-SLIDES.append(slide(3, f"""
-  <div class="pad center">
-    <h1 class="huge">Your code has a<br><span class="hl">compiler.</span></h1>
-    <h1 class="huge" style="margin-top:40px">Your product model<br>has <span class="hl">hope.</span></h1>
-  </div>"""))
-
-# 4 — what it does
-SLIDES.append(slide(4, """
-  <div class="pad">
-    <span class="eyebrow">What FastPDLC does</span>
-    <h2>Typed artifacts, beside your code.</h2>
-    <div class="flow">
-      <div class="node" style="background:#fff9e6">glossary<br>rules<br>features</div>
-      <div class="arrow">&rarr;</div>
-      <div class="node" style="background:#fbcc00">the gate<br><span class="mono sm">fastpdlc<br>validate</span></div>
-      <div class="arrow">&rarr;</div>
-      <div class="node" style="background:#fff">one bundle<br><span class="mono sm">committed<br>byte-stable</span></div>
+    <h2 class="mega">Nothing<br>breaks.</h2>
+    <div class="crosses">
+      <div class="x">No crash</div>
+      <div class="x">No failing test</div>
+      <div class="x">No review comment</div>
     </div>
-    <p class="lede" style="margin-top:60px">Reviewed in the same pull requests. Checked
-      by the same CI. A rename that breaks three references fails the build in seconds
-      — before a reviewer opens it.</p>
+    <p class="kicker">Eleven months later two meanings are in circulation, and nobody
+      can trace where they diverged.</p>
+  </div>""", bg=ORA))
+
+# ── 3 · the asymmetry ────────────────────────────────────────────────────────
+SLIDES.append(slide(3, """
+  <div class="pad center">
+    <h1 class="giant">Your code<br>has a<br><span class="hl">compiler.</span></h1>
+    <h1 class="giant" style="margin-top:56px">Your product<br>model has<br><span class="hl">hope.</span></h1>
   </div>"""))
 
-# 5 — the codes
+# ── 4 · what it does ─────────────────────────────────────────────────────────
+SLIDES.append(slide(4, f"""
+  <div class="pad">
+    <span class="eyebrow">What it does</span>
+    <h2>Typed artifacts,<br>beside your code.</h2>
+    <div class="flow">
+      <div class="node" style="background:{CRM}">glossary<br>rules<br>features</div>
+      <div class="arrow">&rarr;</div>
+      <div class="node" style="background:{YEL}">the gate<span class="sm">fastpdlc validate</span></div>
+      <div class="arrow">&rarr;</div>
+      <div class="node" style="background:{PAPER}">one bundle<span class="sm">byte-stable</span></div>
+    </div>
+    <p class="kicker">A rename that breaks three references fails the build in seconds
+      — before a reviewer opens it.</p>
+  </div>""", bg=BLU))
+
+# ── 5 · the codes, in the homepage rail's own styling ────────────────────────
 SLIDES.append(slide(5, f"""
   <div class="pad">
     <span class="eyebrow">Stable diagnostic codes</span>
     <h2>Findings are an API.</h2>
     <div class="codes">
-      <div class="code" style="background:{ORA}"><b>PAC-001</b><span>required field</span></div>
-      <div class="code" style="background:{BLU}"><b>PAC-020</b><span>dangling reference</span></div>
-      <div class="code" style="background:{PUR}"><b>PAC-030</b><span>enum violation</span></div>
-      <div class="code" style="background:{YEL}"><b>PAC-060</b><span>the committed build is stale</span></div>
+      <div class="pac" style="--c:{ORA};--t:#fff"><b>PAC<br>001</b><span class="badge">required field</span></div>
+      <div class="pac" style="--c:{RED};--t:{YEL}"><b>PAC<br>020</b><span class="badge">dangling reference</span></div>
+      <div class="pac" style="--c:{PNK};--t:#fff"><b>PAC<br>030</b><span class="badge">enum violation</span></div>
+      <div class="pac" style="--c:{YEL};--t:{INK}"><b>PAC<br>060</b><span class="badge dark">the build is stale</span></div>
     </div>
     <p class="kicker">Never renumbered. CI, dashboards and humans match on the code,
       never the prose.</p>
-  </div>""", bg=CRM))
+  </div>"""))
 
-# 6 — the new bit
-SLIDES.append(slide(6, """
+# ── 6 · the new bit ──────────────────────────────────────────────────────────
+SLIDES.append(slide(6, f"""
   <div class="pad center">
     <span class="eyebrow">New in 0.2.0</span>
-    <h1 class="huge">A workforce<br>builds it.</h1>
-    <h1 class="huge" style="margin-top:30px">A <span class="hl">gate</span><br>judges it.</h1>
-  </div>""", bg=INK))
+    <h1 class="giant">A workforce<br>builds it.</h1>
+    <h1 class="giant" style="margin-top:44px">A <span class="hl">gate</span><br>judges it.</h1>
+  </div>""", bg=INK, dark=True))
 
-# 7 — the line
-SLIDES.append(slide(7, """
+# ── 7 · the line, with the real faces ────────────────────────────────────────
+SLIDES.append(slide(7, f"""
   <div class="pad">
     <span class="eyebrow">The line</span>
     <h2>Six stations, then a judge.</h2>
-    <div class="stations">
-      <div class="st"><b>ST-01</b>Understand</div>
-      <div class="st human"><b>ST-02</b>Disambiguate<span>human gate</span></div>
-      <div class="st"><b>ST-03</b>Design</div>
-      <div class="st"><b>ST-04</b>Develop</div>
-      <div class="st"><b>ST-05</b>Test</div>
-      <div class="st"><b>ST-06</b>Verify</div>
-      <div class="st machine"><b>ST-08</b>CI gates<span>deterministic</span></div>
-      <div class="st human"><b>ST-09</b>Human merge<span>a person decides</span></div>
+    <div class="stns">
+      {''.join(station_card(i) for i in [0, 1, 2, 3, 4, 5, 7, 8])}
     </div>
     <p class="kicker">Open questions stop the line before design. Building the wrong
       thing correctly is the expensive failure.</p>
   </div>"""))
 
-# 8 — the lenses
+# ── 8 · the lenses ───────────────────────────────────────────────────────────
 SLIDES.append(slide(8, f"""
   <div class="pad">
     <span class="eyebrow">ST-06 &middot; Verify</span>
-    <h2>Four critics, trying to refute.</h2>
+    <h2>Four critics,<br>trying to refute.</h2>
     <div class="lens-grid">
       <div class="lens" style="background:{ORA}"><b>correctness</b>Find an input where it does the wrong thing.</div>
       <div class="lens" style="background:{GRN}"><b>coverage</b>Would the test still pass with the feature deleted?</div>
@@ -149,39 +156,34 @@ SLIDES.append(slide(8, f"""
       built the change never grades it.</p>
   </div>""", bg=CRM))
 
-# 9 — the principle
+# ── 9 · the principle ────────────────────────────────────────────────────────
 SLIDES.append(slide(9, """
   <div class="pad center">
-    <h1 class="huge">Agents propose.<br>Gates enforce.<br>A human merges.</h1>
-    <p class="lede" style="margin-top:70px;max-width:760px">The gate is never an agent.
-      A judge that could be persuaded could not produce evidence.</p>
-  </div>""", bg=INK))
+    <h1 class="giant">Agents<br><span class="hl">propose.</span></h1>
+    <h1 class="giant">Gates<br><span class="hl">enforce.</span></h1>
+    <h1 class="giant">A human<br><span class="hl">merges.</span></h1>
+  </div>""", bg=INK, dark=True))
 
-# 10 — the proof
-SLIDES.append(slide(10, """
+# ── 10 · the proof ───────────────────────────────────────────────────────────
+SLIDES.append(slide(10, f"""
   <div class="pad">
     <span class="eyebrow">Proof, not a promise</span>
-    <h2>It found a bug in itself.</h2>
-    <p class="lede">The blog on fastpdlc.com is stored as product-as-code — ids matching
-      filenames, categories from an allowed set, every cross-link resolving. So it goes
-      through the same gate as everything else.</p>
-    <div class="card mono" style="margin-top:50px">
-      <div class="err">TypeError: Object of type date is not JSON serializable</div>
+    <h2 class="mega">It found<br>a bug in<br>itself.</h2>
+    <div class="term shadow-xl">
+      <div class="tbar"><i style="background:{ORA}"></i><i style="background:{YEL}"></i><i style="background:{GRN}"></i></div>
+      <div class="tbody"><span class="terr">TypeError: Object of type date<br>is not JSON serializable</span></div>
     </div>
-    <p class="kicker">An unquoted date in frontmatter became a Python object the bundle
-      could not serialise. Any project with a date field would have hit it. Fixed in
-      0.2.0, with a regression test.</p>
-  </div>"""))
+    <p class="kicker">This blog is stored as product-as-code, so it goes through the
+      same gate. Fixed in 0.2.0, with a regression test.</p>
+  </div>""", bg=GRN))
 
-# 11 — CTA
+# ── 11 · the CTA ─────────────────────────────────────────────────────────────
 SLIDES.append(slide(11, """
   <div class="pad center">
-    <h1 class="huge">Your product spec,<br><span class="hl">compiled.</span></h1>
+    <h1 class="giant">Your product<br>spec,<br>compiled.</h1>
     <div class="cta mono">pip install fastpdlc</div>
-    <p class="lede" style="margin-top:44px">Two dependencies. No network in the core.
-      LGPL-3.0.</p>
     <div class="url">fastpdlc.com</div>
-  </div>""", footer=False))
+  </div>""", bg=YEL, footer=False))
 
 
 PAGE = """<!doctype html>
@@ -191,102 +193,122 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>FastPDLC — LinkedIn carousel</title>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=block" rel="stylesheet">
 <style>
-  :root {
+  :root{
     --ink:#191919; --yel:#fbcc00; --grn:#00b67a; --ora:#ff6b4a;
     --blu:#4a90e2; --pur:#b47cff; --crm:#fff9e6; --grid:#e5e5e5;
-    --mono:'IBM Plex Mono',monospace; --disp:'Anton',Impact,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --disp:'Anton','Arial Narrow',Impact,sans-serif;
+    --sh:10px 10px 0 var(--ink); --sh-xl:16px 16px 0 var(--ink);
+    --bd:6px solid var(--ink);
   }
   *{box-sizing:border-box;margin:0}
-  body{background:#6b6b6b;font-family:'IBM Plex Sans',sans-serif;color:var(--ink)}
+  body{background:#5a5a5a;font-family:'IBM Plex Sans',sans-serif;color:var(--ink)}
 
   .slide{
     position:relative; width:1080px; height:1350px; overflow:hidden;
-    margin:0 auto 28px; display:flex; flex-direction:column;
-    background-image:radial-gradient(var(--grid) 3px, transparent 3px);
-    background-size:48px 48px;
+    margin:0 auto 30px; display:flex; flex-direction:column;
+    background-color:var(--bg);
+    background-image:radial-gradient(rgba(25,25,25,.14) 4px, transparent 4px);
+    background-size:52px 52px;
   }
-  .slide.plain{background-image:none}
-  .slide[style*="#191919"]{color:#fff;background-image:radial-gradient(#333 3px,transparent 3px)}
-  .slide[style*="#191919"] h1,.slide[style*="#191919"] h2{color:#fff}
-  .slide[style*="#191919"] .lede{color:#c9c9c9}
-  .slide[style*="#191919"] .eyebrow{color:var(--yel)}
+  .slide.dark{color:#fff;background-image:radial-gradient(rgba(255,255,255,.13) 4px,transparent 4px)}
+  .slide.dark .eyebrow{color:var(--yel)}
+  .slide.dark .kicker{border-color:rgba(255,255,255,.35)}
 
-  .pad{flex:1; padding:110px 96px 190px; display:flex; flex-direction:column}
-  .pad.center{justify-content:center; align-items:flex-start}
+  .pad{flex:1; padding:100px 88px 200px; display:flex; flex-direction:column}
+  .pad.center{justify-content:center}
 
-  .eyebrow{font-family:var(--mono);font-size:26px;font-weight:600;
-    letter-spacing:.16em;text-transform:uppercase;margin-bottom:34px;display:block}
-  h1{font-family:var(--disp);font-size:96px;line-height:1.02;letter-spacing:.5px}
-  h1.huge{font-size:112px}
-  h2{font-family:var(--disp);font-size:82px;line-height:1.04;letter-spacing:.5px;margin-bottom:44px}
-  .lede{font-size:36px;line-height:1.45;max-width:860px;margin-top:34px;color:#333}
-  .kicker{margin-top:auto;font-size:32px;font-weight:600;line-height:1.4;
-    border-top:5px solid var(--ink);padding-top:30px}
-  .slide[style*="#191919"] .kicker{border-color:#444}
-  .hl{background:linear-gradient(transparent 52%, var(--yel) 52%, var(--yel) 90%, transparent 90%);
-    padding-inline:.06em}
+  .eyebrow{font-family:var(--mono);font-size:27px;font-weight:600;
+    letter-spacing:.18em;text-transform:uppercase;margin-bottom:30px;display:block}
+  h1,h2{font-family:var(--disp);font-weight:400;letter-spacing:.5px;line-height:.98}
+  h2{font-size:88px;margin-bottom:46px}
+  .mega{font-size:132px}
+  .giant{font-size:124px}
+  .hl{background:linear-gradient(transparent 50%, var(--yel) 50%, var(--yel) 92%, transparent 92%);
+    padding-inline:.05em}
+  .slide.dark .hl{color:var(--ink)}
+  .kicker{margin-top:auto;font-size:33px;font-weight:600;line-height:1.38;
+    border-top:7px solid var(--ink);padding-top:32px}
 
-  .card{border:6px solid var(--ink);border-radius:22px;box-shadow:14px 14px 0 var(--ink);
-    background:#fff;padding:40px 44px}
-  .mono{font-family:var(--mono);font-size:36px;line-height:1.6}
-  .mono.sm{font-size:24px}
+  .card,.term{border:var(--bd);border-radius:24px;background:#fff}
+  .shadow-xl{box-shadow:var(--sh-xl)}
+  .card{padding:44px 46px}
+  .mono{font-family:var(--mono)}
+  .card.mono{font-size:40px;line-height:1.55}
   .dim{color:#8a8a8a}
-  .strike{color:var(--ora);font-weight:600}
-  .err{color:var(--ora);font-size:30px;font-weight:600;word-break:break-word}
+  .add{color:var(--ora);font-weight:600}
 
-  ul.big{list-style:none;padding:0;margin-top:20px}
-  ul.big li{font-family:var(--disp);font-size:64px;line-height:1.5;letter-spacing:.4px}
-  ul.big li::before{content:'\\2715';color:var(--ora);margin-right:26px}
+  .crosses{display:grid;gap:28px;margin-top:16px}
+  .x{display:flex;align-items:center;gap:28px;font-family:var(--disp);font-size:66px;
+    background:#fff;border:var(--bd);border-radius:22px;box-shadow:var(--sh);padding:24px 34px}
+  .x::before{content:'\\2715';color:var(--ora);font-size:56px;font-weight:700}
 
-  .flow{display:flex;align-items:center;gap:26px;margin-top:20px}
-  .node{flex:1;min-height:220px;display:flex;flex-direction:column;justify-content:center;
-    text-align:center;font-family:var(--disp);font-size:34px;line-height:1.25;
-    border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);padding:22px}
-  .arrow{font-size:56px;font-weight:700}
+  .flow{display:flex;align-items:center;gap:22px}
+  .node{flex:1;min-height:250px;display:flex;flex-direction:column;justify-content:center;
+    text-align:center;font-family:var(--disp);font-size:38px;line-height:1.22;
+    border:var(--bd);border-radius:24px;box-shadow:var(--sh);padding:24px}
+  .node .sm{display:block;font-family:var(--mono);font-size:22px;margin-top:14px;line-height:1.3}
+  .arrow{font-size:60px;font-weight:700}
+  .slide.dark .arrow{color:#fff}
 
-  .codes{display:grid;grid-template-columns:1fr 1fr;gap:26px}
-  .code{border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);
-    padding:32px 30px;min-height:190px;display:flex;flex-direction:column;justify-content:center}
-  .code b{font-family:var(--disp);font-size:52px;letter-spacing:.5px}
-  .code span{font-size:28px;font-weight:600;margin-top:10px}
+  .codes{display:grid;grid-template-columns:1fr 1fr;gap:30px}
+  .pac{position:relative;background:var(--c);border:var(--bd);border-radius:24px;
+    box-shadow:var(--sh);padding:34px 32px 46px;min-height:250px}
+  .pac b{font-family:var(--disp);font-size:76px;line-height:.92;color:var(--t);
+    -webkit-text-stroke:3px var(--ink);paint-order:stroke fill;display:block}
+  .badge{position:absolute;left:30px;bottom:-20px;background:var(--yel);color:var(--ink);
+    border:4px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
+    padding:8px 16px;font-size:23px;font-weight:700}
+  .badge.dark{background:var(--ink);color:var(--yel)}
 
-  .stations{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-  .st{border:5px solid var(--ink);border-radius:18px;box-shadow:8px 8px 0 var(--ink);
-    background:#fff;padding:24px 26px;font-family:var(--disp);font-size:40px;line-height:1.15}
-  .st b{display:block;font-family:var(--mono);font-size:22px;font-weight:600;color:#6b6b6b;
-    letter-spacing:.08em;margin-bottom:6px}
-  .st span{display:block;font-family:'IBM Plex Sans',sans-serif;font-size:23px;
-    font-weight:600;color:#555;margin-top:8px}
-  .st.human{background:#f2f2f2;border-style:dashed}
-  .st.machine{background:var(--yel)}
+  .stns{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .stn{position:relative;display:flex;align-items:center;gap:20px;background:#fff;
+    border:var(--bd);border-radius:22px;box-shadow:var(--sh);padding:18px 22px 30px}
+  .stn[data-kind=human]{background:#f2f2f2;border-style:dashed}
+  .stn[data-kind=machine]{background:var(--crm)}
+  .st-avatar{width:68px;height:68px;flex:none}
+  .stn-t{font-family:var(--disp);font-size:35px;line-height:1.08}
+  .stn-t b{display:block;font-family:var(--mono);font-size:21px;font-weight:600;
+    color:#6b6b6b;letter-spacing:.08em;margin-bottom:5px}
+  .chip{position:absolute;left:24px;bottom:-16px;background:var(--yel);
+    border:4px solid var(--ink);border-radius:11px;box-shadow:4px 4px 0 var(--ink);
+    padding:5px 13px;font-size:21px;font-weight:700}
 
-  .lens-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px}
-  .lens{border:6px solid var(--ink);border-radius:22px;box-shadow:10px 10px 0 var(--ink);
-    padding:32px 30px;min-height:250px;font-size:28px;font-weight:500;line-height:1.35}
-  .lens b{display:block;font-family:var(--mono);font-size:36px;font-weight:600;margin-bottom:16px}
+  .lens-grid{display:grid;grid-template-columns:1fr 1fr;gap:30px}
+  .lens{border:var(--bd);border-radius:24px;box-shadow:var(--sh);padding:34px 32px;
+    min-height:280px;font-size:30px;font-weight:500;line-height:1.32}
+  .lens b{display:block;font-family:var(--mono);font-size:40px;font-weight:600;margin-bottom:18px}
 
-  .cta{margin-top:56px;display:inline-block;background:var(--ink);color:var(--yel);
-    font-size:46px;padding:30px 44px;border-radius:20px}
-  .url{margin-top:auto;padding-top:40px;font-family:var(--disp);font-size:62px;letter-spacing:.5px}
+  .term{background:var(--ink);overflow:hidden;padding:0}
+  .tbar{display:flex;gap:14px;padding:22px 26px;background:#2a2a2a;border-bottom:5px solid var(--ink)}
+  .tbar i{width:22px;height:22px;border-radius:50%}
+  .tbody{padding:40px 34px}
+  .terr{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--ora);line-height:1.5}
 
-  .foot{position:absolute;left:96px;right:96px;bottom:52px;display:flex;
+  .cta{margin-top:64px;align-self:flex-start;background:var(--ink);color:var(--yel);
+    font-size:52px;padding:34px 48px;border-radius:22px;box-shadow:var(--sh-xl)}
+  .url{margin-top:auto;font-family:var(--disp);font-size:70px;letter-spacing:.5px}
+
+  .foot{position:absolute;left:88px;right:88px;bottom:56px;display:flex;
     align-items:center;justify-content:space-between}
-  .foot span{display:flex;align-items:center;gap:16px;font-family:var(--disp);
-    font-size:34px;letter-spacing:.3px}
-  .foot .num{font-family:var(--mono);font-size:28px;font-weight:600;color:#8a8a8a}
-  .slide[style*="#191919"] .foot{color:#fff}
-  .mark{width:52px;height:52px}
+  .fmark{display:flex;align-items:center;gap:18px;font-family:var(--disp);
+    font-size:38px;letter-spacing:.3px}
+  .num{font-family:var(--mono);font-size:30px;font-weight:600;opacity:.55}
+  .mark{width:56px;height:56px}
 
   /* ── the PDF ─────────────────────────────────────────────────────────────
-     Save as PDF with margins NONE and "Background graphics" ON. */
+     Save as PDF, margins NONE, "Background graphics" ON. */
   @page{size:1080px 1350px;margin:0}
   @media print{
     body{background:#fff}
-    .slide{margin:0;page-break-after:always;break-after:page;box-shadow:none}
+    .slide{margin:0;page-break-after:always;break-after:page}
     .slide:last-child{page-break-after:auto;break-after:auto}
     .note{display:none}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
   .note{max-width:1080px;margin:26px auto;padding:22px 26px;background:#fff;
     border:5px solid var(--ink);border-radius:18px;font-size:19px;line-height:1.55}
@@ -297,11 +319,10 @@ PAGE = """<!doctype html>
 <body>
 <div class="note">
   <b>How to post this</b><br>
-  Print this page &rarr; <b>Destination:</b> Save as PDF &rarr; <b>Layout:</b> Portrait
-  &rarr; <b>Margins:</b> None &rarr; tick <b>Background graphics</b>. You get one
-  1080&times;1350 slide per page. On LinkedIn choose <b>Add a document</b>, upload the
-  PDF, and give it a title — the title shows above the carousel, so make it the hook.
-  This page is <code>noindex</code>.
+  Print this page &rarr; <b>Destination:</b> Save as PDF &rarr; <b>Margins:</b> None
+  &rarr; tick <b>Background graphics</b>. One 1080&times;1350 slide per page. On
+  LinkedIn choose <b>Add a document</b>, upload the PDF, and title it with the hook —
+  the title shows above the carousel. This page is <code>noindex</code>.
 </div>
 __SLIDES__
 </body>
