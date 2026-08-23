@@ -34,3 +34,26 @@ Issues = "https://github.com/tarvitave/fastpdlc/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["fastpdlc"]
+
+# The sdist defaults to "everything not gitignored", which shipped the whole
+# marketing site, the Terraform and the deploy config to PyPI. Nothing secret was
+# in them -- but a published artifact should not depend on a .gitignore staying
+# correct forever. One forgotten .env in site/ would be public and unrecallable,
+# because a PyPI version can be yanked but never replaced.
+#
+# So the sdist is an allowlist: the package, its tests, and the docs a packager
+# needs. Anything operational stays in git and out of the tarball.
+[tool.hatch.build.targets.sdist]
+only-include = [
+  "fastpdlc",
+  "tests",
+  "examples",
+  "template",
+  "action.yml",
+  "copier.yml",
+  "README.md",
+  "CHANGELOG.md",
+  "RELEASING.md",
+  "LICENSE",
+  "pyproject.toml",
+]

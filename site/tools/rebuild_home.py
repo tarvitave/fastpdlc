@@ -58,12 +58,18 @@ LENS_SECTION = """
 
 
 def lens_cards() -> str:
+    """Each critic gets a face, seeded differently so four agents do not read as one
+    agent copied four times. These are ST-06 stations, so the face is accurate here
+    rather than decorative — and this was the one place on the page with agents and
+    no faces."""
+    from stations import _face
+
     out = []
-    for name, colour, question in LENSES:
+    for i, (name, colour, question) in enumerate(LENSES):
         out.append(f"""<article class="lens reveal" style="--c:{colour}">
-        <h3>{name}</h3>
+        <div class="lens-head">{_face(colour, i + 2)}<h3>{name}</h3></div>
         <p>{question}</p>
-        <span class="badge">lens</span>
+        <span class="badge">agent critic</span>
       </article>""")
     return "\n      ".join(out)
 

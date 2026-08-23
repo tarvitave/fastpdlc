@@ -50,5 +50,10 @@ jobs:
           echo "requested=$want  package=$pkg  (event=${{ github.event_name }})"
           test "$want" = "$pkg" || { echo "::error::requested ($want) != package version ($pkg)"; exit 1; }
 
+      - name: Secret scan the built artifacts
+        # A PyPI version can be yanked but never replaced, so this is
+        # the last point at which a leaked credential is still recallable.
+        run: python scripts/check_no_secrets.py --dist
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
