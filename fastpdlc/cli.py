@@ -10,10 +10,11 @@ Exit code is non-zero iff validation found errors — wire ``fastpdlc validate``
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import sys
 
-from . import engine, evidence
+from . import engine, evidence, orchestration
 from .config import load_config
 from .plugin import load_plugin
 
@@ -32,6 +33,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ev.add_argument("-o", "--output", default=None,
                     help="write the record here instead of stdout")
+
+    orc = sub.add_parser(
+        "orchestrate",
+        help="run the agent-built lifecycle over one artifact (ST-01..ST-06)",
+    )
+    orc.add_argument("feature", help="the artifact id to build, e.g. FEAT-refunds")
+    orc.add_argument("--dry-run", action="store_true",
+                     help="use the offline stub runner: exercises the pipeline, calls no model")
+    orc.add_argument("--resolve", action="append", default=[], metavar="ID=ANSWER",
+                     help="answer a Disambiguate question (repeatable)")
+    orc.add_argument("--max-repair", type=int, default=None,
+                     help=f"bounded repair rounds (default {orchestration.Orchestrator.MAX_REPAIR})")
+    orc.add_argument("-o", "--output", default=None,
+                     help="write the run report here instead of stdout")
     return p
 
 
@@ -44,6 +59,46 @@ def main(argv: list[str] | None = None) -> int:
         for path in engine.build(config, args.root, registry):
             print(f"wrote {path}")
         return 0
+
+    if args.cmd == "orchestrate":
+        resolutions = {}
+        for pair in args.resolve:
+            key, _, value = pair.partition("=")
+            if not value:
+                print(f"--resolve expects ID=ANSWER, got: {pair}", file=sys.stderr)
+                return 2
+            resolutions[key.strip()] = value.strip()
+
+        if args.dry_run:
+            runner = orchestration.StubRunner()
+        else:
+            from .runners import ClaudeRunner
+            runner = ClaudeRunner()
+
+        try:
+            bundle = engine.load(config, args.root)
+            brief = json.dumps({name: [r.get("id") for r in recs]
+                                for name, recs in bundle.items()})[:4000]
+        except Exception:
+            brief = ""
+
+        report = orchestration.Orchestrator(
+            runner, brief=brief, resolutions=resolutions,
+            max_repair=args.max_repair,
+            on_phase=lambda phase: print(f"── {phase}", file=sys.stderr),
+        ).run(args.feature)
+
+        text = report.render()
+        if args.output:
+            out = pathlib.Path(args.root) / args.output
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, encoding="utf-8", newline="\n")
+            print(f"wrote {out}")
+        else:
+            sys.stdout.write(text)
+
+        # blocked and refuted are both non-zero: the line did not propose a change.
+        return 0 if report.status == "proposed" else 1
 
     if args.cmd == "evidence":
         record = evidence.build_record(config, args.root, registry)

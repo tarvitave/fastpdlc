@@ -273,3 +273,114 @@ def test_cli_surface_manifest_is_current():
     assert actual == expected, (
         "cli_surface.json is stale -- run: python site/tools/gen_cli_surface.py"
     )
+
+
+# ── the agent-built lifecycle ────────────────────────────────────────────────
+def _orch(**kw):
+    from fastpdlc import orchestration
+    return orchestration, kw
+
+
+def test_pipeline_runs_the_stations_in_order():
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    runner = StubRunner()
+    report = Orchestrator(runner).run("FEAT-refunds")
+
+    assert report.status == "proposed"
+    assert [s.station for s in report.steps] == ["ST-01", "ST-02", "ST-03", "ST-04", "ST-05"]
+    # all four lenses ran, and none of them shipped an opinion it did not have
+    assert [v.lens for v in report.verdicts] == [
+        "correctness", "coverage", "security", "reproduce"]
+    assert report.repair_rounds == 0
+
+
+def test_disambiguate_blocks_before_design():
+    """Building the wrong thing correctly is the expensive failure: an open question
+    must stop the line before the Architect starts."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    questions = [{"id": "q1", "dimension": "refund window start",
+                  "question": "From authorization, settlement or delivery?"}]
+    report = Orchestrator(StubRunner(questions=questions)).run("FEAT-refunds")
+
+    assert report.status == "blocked"
+    assert report.disambiguation == questions
+    stations = [s.station for s in report.steps]
+    assert stations == ["ST-01", "ST-02"]          # Design never ran
+    assert "ST-03" not in stations
+
+
+def test_resolved_questions_let_the_line_continue():
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    questions = [{"id": "q1", "dimension": "refund window start", "question": "?"}]
+    report = Orchestrator(
+        StubRunner(questions=questions),
+        resolutions={"q1": "from settlement"},
+    ).run("FEAT-refunds")
+
+    assert report.status == "proposed"
+    assert "ST-03" in [s.station for s in report.steps]
+
+
+def test_a_blocking_verdict_triggers_bounded_repair():
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    refuting = {"security": {"lens": "security", "refuted": True, "severity": "blocker",
+                             "reason": "no authz on the money path",
+                             "failing_case": "unauthenticated POST /refunds"}}
+    report = Orchestrator(StubRunner(verdicts=refuting)).run("FEAT-refunds")
+
+    assert report.status == "refuted"
+    assert report.repair_rounds == 2                       # the bound, not forever
+    assert [v.lens for v in report.blocking] == ["security"]
+    assert "ST-04" in [s.station for s in report.steps]     # repair ran on the developer
+
+
+def test_minor_findings_do_not_block():
+    """A gate that fires on nitpicks gets bypassed, and a bypassed gate is worse
+    than none."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    nitpick = {"coverage": {"lens": "coverage", "refuted": True, "severity": "minor",
+                            "reason": "could add one more edge case", "failing_case": ""}}
+    report = Orchestrator(StubRunner(verdicts=nitpick)).run("FEAT-refunds")
+
+    assert report.status == "proposed"
+    assert report.blocking == []
+    assert report.repair_rounds == 0
+
+
+def test_a_failed_lens_abstains_rather_than_blocking():
+    """An unreachable critic must never take down the line."""
+    from fastpdlc.orchestration import Orchestrator, Station, VERDICT_SCHEMA
+
+    class Flaky:
+        def run(self, station, prompt, schema=None):
+            if schema is VERDICT_SCHEMA and '"security"' in prompt:
+                raise RuntimeError("provider unreachable")
+            if schema is VERDICT_SCHEMA:
+                return {"lens": "x", "refuted": False, "severity": "none", "reason": "ok"}
+            return {"questions": [], "approach": "a", "files": [], "criteria_to_tests": [],
+                    "files_changed": [], "diff_summary": "d",
+                    "tests_added": [], "tests_passed": True, "coverage_notes": "c"}
+
+    report = Orchestrator(Flaky()).run("FEAT-refunds")
+    security = next(v for v in report.verdicts if v.lens == "security")
+    assert security.refuted is False
+    assert "inconclusive" in security.reason
+    assert report.status == "proposed"
+
+
+def test_the_orchestrator_cannot_merge_anything():
+    """Its terminal state is a report. Autonomy stops where the stakes rise."""
+    from fastpdlc import orchestration
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    report = Orchestrator(StubRunner()).run("FEAT-refunds")
+    assert report.status in {"proposed", "refuted", "blocked", "error"}
+    # no station on the line past the gate is an agent
+    for sid in ("ST-07", "ST-08", "ST-09", "ST-10"):
+        assert orchestration.BY_ID[sid].kind != orchestration.AGENT
+    assert orchestration.BY_ID["ST-09"].kind == orchestration.HUMAN

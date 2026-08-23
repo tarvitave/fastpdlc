@@ -57,6 +57,36 @@ pip install fastpdlc
    fastpdlc validate    # schema + graph + staleness; non-zero exit on errors
    ```
 
+## The agent-built lifecycle
+
+`fastpdlc orchestrate` runs a station line over one artifact: **Understand →
+Disambiguate (human gate) → Design → Develop → Test → adversarial Verify**, with a
+bounded repair loop.
+
+```bash
+fastpdlc orchestrate FEAT-refunds                  # needs ANTHROPIC_API_KEY
+fastpdlc orchestrate FEAT-refunds --dry-run        # offline; exercises the pipeline
+pip install 'fastpdlc[agents]'                     # the reasoning stations
+```
+
+Four critics attack the result through independent lenses — **correctness,
+coverage, security, reproduce** — each defaulting to *refuted* unless convinced. A
+blocking verdict feeds back to a repair round; after `--max-repair` rounds the run
+reports honestly rather than proposing.
+
+Two properties are structural, not configurable:
+
+- **Disambiguate blocks.** Open questions stop the line *before* design, because
+  building the wrong thing correctly is the expensive failure. Answer them with
+  `--resolve q1="from settlement"` and re-run.
+- **Nothing merges.** The orchestrator's terminal state is a report. `validate` is
+  the judge, and a human decides. Every station past the gate is deterministic or
+  human by construction.
+
+Control flow is ordinary code; reasoning lives inside a station. Supply your own
+`Runner` to change what a station does — writing code is a tool-using agent's job,
+and the seam is there for it.
+
 ## Evidence
 
 `fastpdlc evidence` emits a content-addressed record of what was checked, when, on

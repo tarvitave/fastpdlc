@@ -22,6 +22,8 @@ dependencies = ["pyyaml>=6.0", "pydantic>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# The reasoning stations. Core validation never needs this.
+agents = ["anthropic>=0.40"]
 
 [project.scripts]
 fastpdlc = "fastpdlc.cli:main"
