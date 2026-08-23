@@ -35,7 +35,35 @@ That's it — no `PYPI_API_TOKEN`, no `twine` credentials.
 3. Publish a **GitHub Release** from that tag (`gh release create vX.Y.Z --generate-notes`).
    That fires `publish.yml`, which asserts the tag matches `pyproject.toml`'s version,
    builds the sdist + wheel, and uploads to PyPI via OIDC.
-4. Verify: `pip install fastpdlc==X.Y.Z`.
+4. Verify — but see the propagation note below before concluding anything failed.
+
+Also update `CHANGELOG.md` in step 1, while the reasons for the changes are still to
+hand.
+
+### Verifying, and why it looks broken for a few minutes
+
+**PyPI's JSON API updates before the index `pip` reads.** Immediately after a
+successful publish, `https://pypi.org/pypi/fastpdlc/json` will list the new version
+while `pip install` still reports *"from versions: <old>"*. That is CDN propagation,
+not a failed release. It took about five minutes for 0.2.0.
+
+Wait for the index rather than guessing:
+
+```bash
+until pip index versions fastpdlc 2>/dev/null | grep -q 'X\.Y\.Z'; do sleep 10; done
+pip install "fastpdlc==X.Y.Z"
+```
+
+Two things that make a verification look like a failure when it is not:
+
+- **Run it outside the repository.** Python puts the working directory on `sys.path`,
+  so `import fastpdlc` from the repo root imports the local source tree, not what you
+  just installed — and it will fail on a missing dependency the venv does not have.
+- **Use a clean virtualenv**, so you are testing the published artifact rather than
+  your editable install.
+
+A genuinely failed publish shows up as a red run in
+`gh run list --workflow=publish.yml`, not as a slow index.
 
 **Fallback if the release event doesn't fire the workflow** (GitHub occasionally
 doesn't trigger on `release`, e.g. after a delete/recreate): run it manually from

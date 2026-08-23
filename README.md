@@ -260,7 +260,8 @@ plugin system above, doing real work.
 ## Releasing
 
 Publishing to PyPI is automated via GitHub Releases + Trusted Publishing — see
-[RELEASING.md](RELEASING.md).
+[RELEASING.md](RELEASING.md). Changes per version are in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
