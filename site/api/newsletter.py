@@ -54,6 +54,17 @@ Rules:
 - No emoji. No exclamation marks. No "we're excited to announce".
 - Do not invent features, customers, metrics, or version numbers. If you are unsure
   whether something exists, write about the idea instead of the feature.
+- THE ENTIRE CLI SURFACE IS:
+      fastpdlc build          regenerate the committed JSON bundle
+      fastpdlc validate       schema + graph + staleness; non-zero exit gates CI
+      flags: -c/--config, -C/--root, -p/--plugin
+  There are no other subcommands and no other flags. Never write `--check`,
+  `--strict`, `--fix`, `fastpdlc lint`, or anything else. Staleness is checked by
+  `fastpdlc validate` -- it is not a separate command.
+- The config file is `product.config.yaml` and it is YAML. There is no TOML, JSON
+  or INI config. Do not invent filenames or extensions for it.
+- Artifacts are markdown with YAML frontmatter under the configured `product_dir`.
+  The compiled output is a single JSON bundle at the configured `output` path.
 - Plain markdown: ## for the one subheading if you need it, - for lists, ` for code.
   No images, no HTML, no front matter.
 """
@@ -153,6 +164,17 @@ body: the newsletter in plain markdown, 250-400 words."""
         raise ValueError(f"body word count {words} out of range")
     if "<script" in body.lower():
         raise ValueError("body contains markup that should not be there")
+
+    # Guard against invented CLI surface. An unattended send has no reviewer to
+    # notice that `fastpdlc build --check` is not a real command, and a reader who
+    # copies it gets an argparse error and concludes the tool is broken.
+    for verb in re.findall(r"fastpdlc\s+(?:-\w+\s+\S+\s+)*([a-z][a-z-]*)", body):
+        if verb not in {"build", "validate"}:
+            raise ValueError(f"invented CLI subcommand: fastpdlc {verb}")
+    for line in body.splitlines():
+        for flag in re.findall(r"fastpdlc.*?(--[a-z-]+)", line):
+            if flag not in {"--config", "--root", "--plugin"}:
+                raise ValueError(f"invented CLI flag: {flag}")
 
     return subject, body
 
