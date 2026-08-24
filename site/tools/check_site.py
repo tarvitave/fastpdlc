@@ -35,6 +35,7 @@ CODES = {
     "SITE-031": "referenced local asset does not exist",
     "SITE-040": "page has no <title>",
     "SITE-041": "page does not have exactly one <h1>",
+    "SITE-050": "page has no markdown rendition for agents",
 }
 
 
@@ -150,6 +151,11 @@ def check_page(path: pathlib.Path) -> list[tuple[str, str]]:
             continue
         code = "SITE-031" if candidate.suffix in {".css", ".js", ".png", ".woff2"} else "SITE-030"
         out.append((code, f"{rel}: {target}"))
+
+    # Every page should have a .md beside it: agents asking for text/markdown get
+    # served that file, and a missing one silently falls back to HTML chrome.
+    if path.name != "404.html" and not path.with_suffix(".md").exists():
+        out.append(("SITE-050", rel))
 
     return out
 

@@ -19,6 +19,7 @@ fi
 echo "→ rebuilding and fingerprinting"
 python tools/render_blog.py
 python tools/render_pages.py
+python tools/render_markdown.py
 python tools/fingerprint_assets.py
 
 echo "→ site structure gate"

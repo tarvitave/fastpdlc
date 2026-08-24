@@ -40,9 +40,29 @@ www.{$SITE_DOMAIN} {
 	}
 
 
+	# ── markdown for agents (acceptmarkdown.com) ─────────────────────────
+	# An agent reading the HTML gets ~26% signal and ~74% chrome. Every page has
+	# a .md rendition beside it; this serves that when markdown is asked for.
+	#
+	# `Vary: Accept` is not optional here: without it a CDN will hand the cached
+	# HTML to an agent asking for markdown, or the reverse, depending on which
+	# variant landed in the cache first.
+	@markdown header Accept *text/markdown*
+	handle @markdown {
+		root * /srv
+		header Content-Type "text/markdown; charset=utf-8"
+		header >Vary "Accept, Accept-Encoding"
+		header Cache-Control "public, max-age=300, must-revalidate"
+		try_files {path}.md {path}index.md {path}/index.md {path}
+		file_server
+	}
+
 	# ── the static site ──────────────────────────────────────────────────
 	handle {
 		root * /srv
+		# Declared on the HTML branch too, so a cache keyed on this header knows
+		# both representations exist.
+		header >Vary "Accept, Accept-Encoding"
 
 		# Fingerprinted assets could be cached forever; these aren't, so keep
 		# it short enough that a deploy is visible within the hour.
@@ -55,6 +75,12 @@ www.{$SITE_DOMAIN} {
 	}
 
 	handle_errors {
+		@404md expression {err.status_code} == 404
+		@wants_md header Accept *text/markdown*
+		rewrite @404md /404.html
+		# an agent that asked for markdown gets a markdown 404 body it can act on
+		rewrite @wants_md /404.md
+
 		@404 expression {err.status_code} == 404
 		rewrite @404 /404.html
 		file_server {
