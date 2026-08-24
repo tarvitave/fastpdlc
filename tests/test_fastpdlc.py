@@ -290,7 +290,8 @@ def test_pipeline_runs_the_stations_in_order():
     report = Orchestrator(runner).run("FEAT-refunds")
 
     assert report.status == "proposed"
-    assert [s.station for s in report.steps] == ["ST-01", "ST-02", "ST-03", "ST-04", "ST-05"]
+    assert [s.station for s in report.steps] == [
+        "ST-01", "ST-02", "ST-03", "ST-04", "ST-04b", "ST-05"]
     # all four lenses ran, and none of them shipped an opinion it did not have
     assert [v.lens for v in report.verdicts] == [
         "correctness", "coverage", "security", "reproduce"]
@@ -1102,3 +1103,100 @@ def test_evidence_verify_rejects_an_unknown_schema(tmp_path):
     from fastpdlc import evidence
     problems = evidence.verify({"schema": "something-else/9"}, str(tmp_path))
     assert problems and "unknown schema" in problems[0]
+
+
+# ── ST-04b Clean ─────────────────────────────────────────────────────────────
+def test_clean_runs_between_develop_and_test():
+    """An agent that has just solved a problem leaves the shape of the struggle in
+    the code. Nothing downstream asked whether that was the simplest form of it."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    report = Orchestrator(StubRunner()).run("FEAT-refunds")
+    stations = [s.station for s in report.steps]
+    assert stations == ["ST-01", "ST-02", "ST-03", "ST-04", "ST-04b", "ST-05"]
+    assert stations.index("ST-04b") > stations.index("ST-04")
+    assert stations.index("ST-04b") < stations.index("ST-05")
+
+
+def test_clean_can_be_skipped():
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    report = Orchestrator(StubRunner(), clean=False).run("FEAT-refunds")
+    assert "ST-04b" not in [s.station for s in report.steps]
+    assert report.status == "proposed"
+
+
+def test_a_cleaner_that_admits_changing_behaviour_is_not_trusted():
+    """Simplification that alters behaviour is Develop's job done without Develop's
+    tests. The claim is recorded; the work is dropped."""
+    from fastpdlc.orchestration import CLEAN_SCHEMA, Orchestrator
+
+    class Overreaching:
+        def run(self, station, prompt, schema=None):
+            if schema is CLEAN_SCHEMA:
+                return {"files_changed": ["a.py"],
+                        "simplifications": ["rewrote the retry loop"],
+                        "behaviour_preserved": False,
+                        "notes": "the old loop retried twice, mine retries once"}
+            return {"questions": [], "approach": "a", "files": [],
+                    "criteria_to_tests": [], "files_changed": [], "diff_summary": "d",
+                    "tests_added": [], "tests_passed": True, "coverage_notes": "c",
+                    "lens": "x", "refuted": False, "severity": "none", "reason": "ok"}
+
+    report = Orchestrator(Overreaching()).run("FEAT-refunds")
+    assert report.simplifications == []              # not carried forward
+    assert any("could not preserve behaviour" in n for n in report.notes)
+    assert report.status == "proposed"               # but it does not fail the run
+
+
+def test_a_well_behaved_cleaner_is_recorded():
+    from fastpdlc.orchestration import CLEAN_SCHEMA, Orchestrator
+
+    class Tidy:
+        def run(self, station, prompt, schema=None):
+            if schema is CLEAN_SCHEMA:
+                return {"files_changed": ["a.py"],
+                        "simplifications": ["collapsed duplicate validation",
+                                            "named the magic number"],
+                        "behaviour_preserved": True, "notes": ""}
+            return {"questions": [], "approach": "a", "files": [],
+                    "criteria_to_tests": [], "files_changed": [], "diff_summary": "d",
+                    "tests_added": [], "tests_passed": True, "coverage_notes": "c",
+                    "lens": "x", "refuted": False, "severity": "none", "reason": "ok"}
+
+    report = Orchestrator(Tidy()).run("FEAT-refunds")
+    assert report.simplifications == ["collapsed duplicate validation",
+                                      "named the magic number"]
+    assert json.loads(report.render())["simplifications"] == report.simplifications
+
+
+def test_inserting_the_cleaner_did_not_renumber_the_roster():
+    """Station ids are referenced in decks and diagrams. Renumbering a stable
+    reference to make room is the mistake we refuse to make with PAC codes."""
+    from fastpdlc.orchestration import BY_ID, ROSTER
+
+    ids = [s.id for s in ROSTER]
+    assert ids == ["ST-01", "ST-02", "ST-03", "ST-04", "ST-04b",
+                   "ST-05", "ST-06", "ST-07", "ST-08", "ST-09", "ST-10"]
+    assert BY_ID["ST-05"].name == "Test"          # unchanged by the insertion
+    assert BY_ID["ST-06"].name == "Verify"
+    assert BY_ID["ST-08"].name == "CI gates"
+
+
+def test_the_cleaner_needs_tools_like_develop(tmp_path):
+    from fastpdlc.coding import CodingRunner
+    from fastpdlc.orchestration import BY_ID
+
+    class Recorder:
+        def __init__(self):
+            self.seen = []
+
+        def run(self, station, prompt, schema=None):
+            self.seen.append(station.id)
+            return {"ok": True}
+
+    rec = Recorder()
+    runner = CodingRunner(root=tmp_path, api_key="test", fallback=rec)
+    runner.run(BY_ID["ST-03"], "design")          # delegated
+    assert rec.seen == ["ST-03"]
+    assert "ST-04b" not in rec.seen               # Clean is NOT delegated

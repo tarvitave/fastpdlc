@@ -185,7 +185,8 @@ class CodingRunner:
             return f"error: {exc}"
 
     def run(self, station: Station, prompt: str, schema: dict | None = None) -> dict:
-        if station.id != "ST-04":
+        # Clean edits files exactly as Develop does, so it needs the same tools.
+        if station.id not in ("ST-04", "ST-04b"):
             return self.fallback.run(station, prompt, schema)
 
         client = self._get_client()
@@ -202,7 +203,7 @@ class CodingRunner:
                 messages=messages,
             )
             if getattr(response, "stop_reason", None) == "refusal":
-                raise RuntimeError("ST-04 refused by safety classifier")
+                raise RuntimeError(f"{station.id} refused by safety classifier")
 
             if response.stop_reason != "tool_use":
                 break

@@ -27,6 +27,7 @@ from .evidence import build_record
 from .evidence import render as render_evidence
 from .evidence import verify as verify_evidence
 from .orchestration import (
+    CLEAN_SCHEMA,
     LENSES,
     ROSTER,
     Orchestrator,
@@ -41,12 +42,13 @@ from .orchestration import (
 )
 from .plugin import Registry, load_plugin
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 __all__ = [
+    # the agent-built lifecycle
+    "CLEAN_SCHEMA",
     # diagnostics
     "CODES",
-    # the agent-built lifecycle
     "LENSES",
     "ROSTER",
     # config

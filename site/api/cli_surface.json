@@ -23,6 +23,7 @@
         "--cross-provider",
         "--dry-run",
         "--max-repair",
+        "--no-clean",
         "--output",
         "--resolve",
         "--write"

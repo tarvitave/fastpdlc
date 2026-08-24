@@ -49,6 +49,11 @@ ROSTER: tuple[Station, ...] = (
     Station("ST-02", "Disambiguate", "human gate", HUMAN),
     Station("ST-03", "Design", "the Architect", AGENT, "claude-opus-5", "high"),
     Station("ST-04", "Develop", "writes code", AGENT, "claude-opus-5", "high"),
+    # Inserted rather than renumbered: ST-05..ST-10 are referenced in decks,
+    # diagrams and prose elsewhere, and renumbering a stable reference to make
+    # room is the same mistake as renumbering a diagnostic code.
+    Station("ST-04b", "Clean", "simplify, without changing behaviour", AGENT,
+            "claude-opus-5", "high"),
     Station("ST-05", "Test", "adversarial coverage", AGENT, "claude-opus-5", "high"),
     Station("ST-06", "Verify", "4 refuting lenses", AGENT, "claude-opus-5", "high"),
     Station("ST-07", "Assemble", "one gated PR", MACHINE),
@@ -129,6 +134,20 @@ DEVELOP_SCHEMA = {
     "additionalProperties": False,
 }
 
+CLEAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "files_changed": {"type": "array", "items": {"type": "string"}},
+        "simplifications": {"type": "array", "items": {"type": "string"}},
+        # Self-reported, and treated as a claim rather than a fact: a Cleaner that
+        # says it changed behaviour is not trusted, and its work is dropped.
+        "behaviour_preserved": {"type": "boolean"},
+        "notes": {"type": "string"},
+    },
+    "required": ["files_changed", "simplifications", "behaviour_preserved"],
+    "additionalProperties": False,
+}
+
 TEST_SCHEMA = {
     "type": "object",
     "properties": {
@@ -203,6 +222,7 @@ class RunReport:
     verdicts: list[Verdict] = dataclasses.field(default_factory=list)
     repair_rounds: int = 0
     disambiguation: list[dict] = dataclasses.field(default_factory=list)
+    simplifications: list[str] = dataclasses.field(default_factory=list)
     status: str = "unknown"      # blocked | refuted | proposed | error
     notes: list[str] = dataclasses.field(default_factory=list)
 
@@ -216,6 +236,7 @@ class RunReport:
             "status": self.status,
             "repair_rounds": self.repair_rounds,
             "disambiguation": self.disambiguation,
+            "simplifications": self.simplifications,
             "steps": [dataclasses.asdict(s) for s in self.steps],
             "verdicts": [dataclasses.asdict(v) for v in self.verdicts],
             "notes": self.notes,
@@ -330,6 +351,9 @@ class StubRunner:
                     "criteria_to_tests": [], "risks": []}
         if schema is DEVELOP_SCHEMA:
             return {"files_changed": [], "diff_summary": "(stub: no code written)"}
+        if schema is CLEAN_SCHEMA:
+            return {"files_changed": [], "simplifications": [],
+                    "behaviour_preserved": True, "notes": "(stub)"}
         if schema is TEST_SCHEMA:
             return {"tests_added": [], "tests_passed": True,
                     "coverage_notes": "(stub)"}
@@ -369,6 +393,7 @@ class Orchestrator:
                  resolutions: dict[str, str] | None = None,
                  max_repair: int | None = None,
                  extra_lens: Callable[[str], dict] | None = None,
+                 clean: bool = True,
                  on_phase: Callable[[str], None] | None = None):
         self.runner = runner
         self.brief = brief
@@ -377,6 +402,7 @@ class Orchestrator:
         # A critic from a different provider, so it cannot share the builder's blind
         # spots. Joins the SAME refute/repair logic as the native lenses.
         self.extra_lens = extra_lens
+        self.clean_enabled = clean
         self.on_phase = on_phase or (lambda _phase: None)
 
     # ── individual stations ──────────────────────────────────────────────
@@ -442,6 +468,34 @@ class Orchestrator:
             f"the files changed and a concise diff summary for the Test engineer and "
             f"the reviewers.\n\nDesign: {json.dumps(design)[:4000]}",
             DEVELOP_SCHEMA,
+        )
+
+    def clean(self, feature: str, dev: dict) -> StepResult:
+        """Simplify what Develop produced, without changing what it does.
+
+        An agent that has just solved a problem leaves the shape of the struggle in
+        the code, and nothing downstream ever asks whether that is the simplest form
+        of it. Test checks the behaviour is right; nobody checks the code is clean.
+
+        Deliberately narrow: no new behaviour, no changed signatures, no new
+        dependencies. A pass that is allowed to "improve while it is in there" is a
+        second Develop station wearing a different hat, and its changes would arrive
+        untested.
+        """
+        self.on_phase("Clean")
+        return self._step(
+            "ST-04b", "Clean",
+            f"You are the Cleaner for '{feature}'. Go back over the change that was "
+            f"just made and simplify it: collapse duplication, name things for what "
+            f"they are, remove dead branches and needless indirection.\n\n"
+            f"Behaviour must not change. Do NOT add features, alter public "
+            f"signatures, change error messages that callers may match on, or add "
+            f"dependencies. If a simplification would change what the code does, "
+            f"leave it alone and say so in notes.\n\n"
+            f"If nothing is worth simplifying, report no changes. A pass that "
+            f"invents work is worse than one that finds none.\n\n"
+            f"The change: {json.dumps(dev)[:4000]}",
+            CLEAN_SCHEMA,
         )
 
     def test(self, feature: str, design: dict, dev: dict) -> StepResult:
@@ -540,6 +594,19 @@ class Orchestrator:
 
         dev = self.develop(feature, design.data)
         report.steps.append(dev)
+
+        if self.clean_enabled:
+            cleaned = self.clean(feature, dev.data)
+            report.steps.append(cleaned)
+            # Trust the claim only when it claims not to have broken anything. A
+            # Cleaner that admits it changed behaviour has done Develop's job
+            # without Develop's tests, so its result is recorded and not used.
+            if cleaned.ok and cleaned.data.get("behaviour_preserved"):
+                report.simplifications = list(cleaned.data.get("simplifications") or [])
+            elif cleaned.ok:
+                report.notes.append(
+                    "the Cleaner reported it could not preserve behaviour; its "
+                    "changes were not carried forward.")
 
         test = self.test(feature, design.data, dev.data)
         report.steps.append(test)

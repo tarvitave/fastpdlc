@@ -65,6 +65,7 @@ bounded repair loop.
 
 ```bash
 fastpdlc orchestrate FEAT-refunds                  # needs ANTHROPIC_API_KEY
+fastpdlc orchestrate FEAT-refunds --no-clean       # skip the simplification pass
 fastpdlc orchestrate FEAT-refunds --dry-run        # offline; exercises the pipeline
 pip install 'fastpdlc[agents]'                     # the reasoning stations
 ```

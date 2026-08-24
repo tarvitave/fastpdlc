@@ -51,6 +51,8 @@ def _build_parser() -> argparse.ArgumentParser:
                      help=f"bounded repair rounds (default {orchestration.Orchestrator.MAX_REPAIR})")
     orc.add_argument("--write", action="store_true",
                      help="let the Develop station actually edit files (default: propose only)")
+    orc.add_argument("--no-clean", action="store_true",
+                     help="skip ST-04b Clean (one fewer model call per run)")
     orc.add_argument("--cross-provider", action="store_true",
                      help="add a non-Claude critic via OpenRouter (needs OPENROUTER_API_KEY)")
     orc.add_argument("-o", "--output", default=None,
@@ -110,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         report = orchestration.Orchestrator(
             runner, brief=brief, resolutions=resolutions,
             max_repair=args.max_repair, extra_lens=extra_lens,
+            clean=not args.no_clean,
             on_phase=lambda phase: print(f"── {phase}", file=sys.stderr),
         ).run(args.feature)
 

@@ -12,6 +12,41 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.4.0] — 2026-08-24
+
+### Added
+
+- **ST-04b Clean** — a simplification station between Develop and Test. An agent
+  that has just solved a problem leaves the shape of the struggle in the code, and
+  nothing downstream ever asked whether that was the simplest form of it. Test
+  checks the behaviour is right; nobody checked the code was clean.
+
+  Deliberately narrow: no new behaviour, no changed signatures, no new dependencies.
+  A pass allowed to "improve while it is in there" is a second Develop station
+  wearing a different hat, and its changes would arrive untested.
+
+  `behaviour_preserved` is treated as a *claim*, not a fact. A Cleaner that admits
+  it could not preserve behaviour has its work dropped and the admission recorded —
+  it does not fail the run, and it does not get to ship either.
+
+  Skip it with `--no-clean` (one fewer model call per run).
+
+- `CLEAN_SCHEMA` exported from the package root.
+
+### Notes
+
+The station is **inserted, not renumbered**. ST-05 through ST-10 are referenced in
+decks, diagrams and prose elsewhere, and renumbering a stable reference to make room
+is the same mistake as renumbering a diagnostic code — so the new station is `ST-04b`
+and a test asserts the rest of the roster is unmoved.
+
+Prompted by Robert Martin's five-agent assembly line (Specifier, Coder, Cleaner,
+Hardener, QA). Of the three we lacked, Cleaner was the real gap. **Hardener** —
+mutation-testing the tests by actually breaking the code — needs a station with a
+shell, which is a materially larger security decision than the current file sandbox
+and is not taken here. **QA** driving a deployed application is a test framework, not
+a validator; pulling it in would blur the line the product rests on.
+
 ## [0.3.1] — 2026-08-24
 
 Housekeeping. **No behaviour change** — `0.3.0` and `0.3.1` are identical to import
@@ -164,7 +199,8 @@ verified by a byte-identical parity test.
 - LGPL-3.0-or-later: copyleft on the engine, and importing it as a library does not
   place your project under the LGPL.
 
-[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tarvitave/fastpdlc/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/tarvitave/fastpdlc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/tarvitave/fastpdlc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/tarvitave/fastpdlc/compare/v0.2.0...v0.2.1

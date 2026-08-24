@@ -130,9 +130,9 @@ def check_page(path: pathlib.Path) -> list[tuple[str, str]]:
 
     # The homepage rail holds the roster twice only at runtime (JS clones it for the
     # loop); the served HTML must contain exactly one set.
-    if rel == "/index.html" and parser.stations_in_rail != 10:
+    if rel == "/index.html" and parser.stations_in_rail != 11:
         out.append(("SITE-011",
-                    f"{rel}: {parser.stations_in_rail} station cards in the rail, expected 10"))
+                    f"{rel}: {parser.stations_in_rail} station cards in the rail, expected 11"))
 
     dupes = [href for href, n in Counter(parser.nav_links).items() if n > 1 and href]
     for href in dupes:
