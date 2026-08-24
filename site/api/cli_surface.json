@@ -13,7 +13,8 @@
     },
     "evidence": {
       "flags": [
-        "--output"
+        "--output",
+        "--verify"
       ],
       "help": "emit a content-addressed record of what was checked, when, and on what"
     },
@@ -29,7 +30,9 @@
       "help": "run the agent-built lifecycle over one artifact (ST-01..ST-06)"
     },
     "validate": {
-      "flags": [],
+      "flags": [
+        "--json"
+      ],
       "help": "schema + graph + staleness checks (CI gate)"
     }
   }

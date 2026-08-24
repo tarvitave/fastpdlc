@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 
 import pytest
@@ -914,3 +915,182 @@ def test_coding_runner_delegates_other_stations(tmp_path):
     runner.run(BY_ID["ST-03"], "design")
     runner.run(BY_ID["ST-06"], "verify")
     assert rec.seen == ["ST-03", "ST-06"]
+
+
+# ── integration: the only test that talks to a real model ────────────────────
+@pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"),
+                    reason="set ANTHROPIC_API_KEY to run the integration test")
+def test_a_real_station_returns_the_declared_shape():
+    """Everything else stubs the model, which means an API change breaks users
+    rather than CI. This runs one cheap station against the real endpoint so a
+    changed response shape or a renamed parameter is caught here first.
+
+    Deliberately ST-01 (haiku, low effort) and a trivial prompt: enough to exercise
+    the request shape and the structured-output contract, cheap enough to run often.
+    """
+    from fastpdlc.orchestration import DISAMBIGUATION_SCHEMA, BY_ID
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner()
+    data = runner.run(
+        BY_ID["ST-01"],
+        "The acceptance criterion is: 'refund window: 30 days'. Return the "
+        "underspecified dimensions a human must resolve. Return at most two.",
+        DISAMBIGUATION_SCHEMA,
+    )
+    assert isinstance(data, dict)
+    assert "questions" in data
+    assert isinstance(data["questions"], list)
+    for q in data["questions"]:
+        assert "dimension" in q and "question" in q
+
+
+
+def _cli_config(tmp_path):
+    """_cli_project builds the tree and returns the root; these need the Config."""
+    from fastpdlc.config import load_config
+    root = _cli_project(tmp_path)
+    return load_config(str(root / "product.config.yaml"))
+
+
+# ── PAC-060 names what drifted ───────────────────────────────────────────────
+def test_staleness_reports_which_artifacts_differ(tmp_path):
+    """'the bundle is stale' tells you to run a command. Naming the artifacts tells
+    you whether it is the change you meant to make, which is the reviewer's actual
+    question."""
+    from fastpdlc import engine
+
+    config = _cli_config(tmp_path)
+    engine.build(config, str(tmp_path))
+
+    bundle_path = tmp_path / "build" / "out.json"
+    data = json.loads(bundle_path.read_text(encoding="utf-8"))
+    data["terms"][0]["definition"] = "tampered"
+    bundle_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n",
+                           encoding="utf-8")
+
+    report = engine.validate(config, str(tmp_path))
+    stale = next(d for d in report.errors if d.code == "PAC-060")
+    assert "artifact(s) differ" in stale.message
+    assert "TERM-" in stale.message                 # it names the id
+
+
+def test_staleness_reports_additions_and_removals(tmp_path):
+    from fastpdlc import engine
+
+    config = _cli_config(tmp_path)
+    engine.build(config, str(tmp_path))
+
+    bundle_path = tmp_path / "build" / "out.json"
+    data = json.loads(bundle_path.read_text(encoding="utf-8"))
+    data["terms"] = [r for r in data["terms"] if r["id"] != "TERM-ledger"]
+    bundle_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n",
+                           encoding="utf-8")
+
+    report = engine.validate(config, str(tmp_path))
+    stale = next(d for d in report.errors if d.code == "PAC-060")
+    assert "+TERM-ledger" in stale.message          # present in sources, absent in build
+
+
+# ── validate --json ──────────────────────────────────────────────────────────
+def test_validate_json_is_machine_readable(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    capsys.readouterr()
+
+    assert main(["-C", str(root), "validate", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema"] == "fastpdlc-report/1"
+    assert payload["result"] == "pass"
+    assert payload["counts"] == {"terms": 2}
+    assert payload["findings"] == []
+
+
+def test_validate_json_carries_codes_not_prose(tmp_path, capsys):
+    """The point of stable codes is that a consumer never has to parse the message."""
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    (root / "product" / "terms" / "TERM-ledger.md").unlink()
+    capsys.readouterr()
+
+    assert main(["-C", str(root), "validate", "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["result"] == "fail"
+    codes = {f["code"] for f in payload["findings"]}
+    assert {"PAC-020", "PAC-060"} <= codes
+    for finding in payload["findings"]:
+        assert set(finding) == {"code", "severity", "where", "message"}
+
+
+# ── orchestrator run persistence ─────────────────────────────────────────────
+def test_a_run_is_kept_even_when_it_is_refuted(tmp_path):
+    """A refuted run holds the verdicts and failing cases -- the most useful thing
+    it produced. Discarding it because nothing was proposed is backwards."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner, save_report
+
+    refuting = {"security": {"lens": "security", "refuted": True, "severity": "blocker",
+                             "reason": "no authz", "failing_case": "unauthenticated POST"}}
+    report = Orchestrator(StubRunner(verdicts=refuting), max_repair=1).run("FEAT-refunds")
+    assert report.status == "refuted"
+
+    path = save_report(tmp_path, report)
+    assert path.parent == tmp_path / ".fastpdlc" / "runs"
+
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["status"] == "refuted"
+    assert saved["repair_rounds"] == 1
+    blocking = [v for v in saved["verdicts"] if v["refuted"]]
+    assert blocking[0]["failing_case"] == "unauthenticated POST"
+
+
+# ── evidence --verify ────────────────────────────────────────────────────────
+def test_evidence_verifies_against_an_unchanged_tree(tmp_path):
+    from fastpdlc import engine, evidence
+
+    config = _cli_config(tmp_path)
+    engine.build(config, str(tmp_path))
+    record = evidence.build_record(config, str(tmp_path))
+
+    assert evidence.verify(record, str(tmp_path)) == []
+
+
+def test_evidence_verify_detects_a_changed_artifact(tmp_path):
+    """This is the whole point of content-addressing: a record nobody can check is
+    a claim, not evidence."""
+    from fastpdlc import engine, evidence
+
+    config = _cli_config(tmp_path)
+    engine.build(config, str(tmp_path))
+    record = evidence.build_record(config, str(tmp_path))
+
+    target = tmp_path / "product" / "terms" / "TERM-payment.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\nedited\n", encoding="utf-8")
+
+    problems = evidence.verify(record, str(tmp_path))
+    assert any("TERM-payment.md changed" in p for p in problems)
+
+
+def test_evidence_verify_detects_a_tampered_bundle_and_a_missing_file(tmp_path):
+    from fastpdlc import engine, evidence
+
+    config = _cli_config(tmp_path)
+    engine.build(config, str(tmp_path))
+    record = evidence.build_record(config, str(tmp_path))
+
+    (tmp_path / "build" / "out.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "product" / "terms" / "TERM-ledger.md").unlink()
+
+    problems = evidence.verify(record, str(tmp_path))
+    assert any("bundle" in p and "changed" in p for p in problems)
+    assert any("TERM-ledger.md is missing" in p for p in problems)
+
+
+def test_evidence_verify_rejects_an_unknown_schema(tmp_path):
+    from fastpdlc import evidence
+    problems = evidence.verify({"schema": "something-else/9"}, str(tmp_path))
+    assert problems and "unknown schema" in problems[0]

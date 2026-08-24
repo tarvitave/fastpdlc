@@ -138,7 +138,8 @@ which commit, and with what result — for the audit conversation that starts *"
 your documented rules matched your implementation"*:
 
 ```bash
-fastpdlc evidence -o build/evidence.json
+fastpdlc evidence -o build/evidence.json      # make a record
+fastpdlc evidence --verify build/evidence.json # check one against this tree
 ```
 
 Every artifact, the config and the bundle carry a SHA-256, so the record is verified

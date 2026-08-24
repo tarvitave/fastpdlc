@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastpdlc"
-version = "0.2.1"
+version = "0.3.0"
 description = "Product-as-code as a validated graph — for any project."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -58,6 +58,13 @@ only-include = [
   "pyproject.toml",
 ]
 
+
+[tool.pytest.ini_options]
+markers = [
+  "integration: talks to a real model; needs ANTHROPIC_API_KEY and costs money",
+]
+# Integration tests are opt-in: `pytest -m integration` to include them.
+addopts = "-m 'not integration'"
 
 [tool.ruff]
 line-length = 100

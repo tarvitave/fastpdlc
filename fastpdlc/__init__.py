@@ -23,7 +23,7 @@ from __future__ import annotations
 from .config import ArtifactType, Config, Reference, load_config
 from .diagnostics import CODES, Diagnostic, Report, register
 from .engine import build, load, render_bundle, validate
-from .evidence import build_record, render as render_evidence
+from .evidence import build_record, render as render_evidence, verify as verify_evidence
 from .orchestration import (
     LENSES,
     ROSTER,
@@ -34,11 +34,12 @@ from .orchestration import (
     StubRunner,
     Verdict,
     read_resolutions,
+    save_report,
     write_questions,
 )
 from .plugin import Registry, load_plugin
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 __all__ = [
     # config
@@ -59,6 +60,7 @@ __all__ = [
     # evidence
     "build_record",
     "render_evidence",
+    "verify_evidence",
     # the agent-built lifecycle
     "LENSES",
     "ROSTER",
@@ -69,6 +71,7 @@ __all__ = [
     "StubRunner",
     "Verdict",
     "read_resolutions",
+    "save_report",
     "write_questions",
     # plugins
     "Registry",

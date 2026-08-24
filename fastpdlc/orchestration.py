@@ -25,6 +25,7 @@ import concurrent.futures
 import dataclasses
 import json
 import pathlib
+from datetime import datetime, timezone
 from typing import Any, Callable, Protocol
 
 # ── the roster ───────────────────────────────────────────────────────────────
@@ -272,6 +273,23 @@ def read_resolutions(root: str | pathlib.Path, feature: str) -> dict[str, str]:
             if q.get("dimension"):
                 out[q["dimension"]] = answer
     return out
+
+
+
+def run_path(root: str | pathlib.Path, feature: str, stamp: str) -> pathlib.Path:
+    return pathlib.Path(root) / ".fastpdlc" / "runs" / f"{feature}-{stamp}.json"
+
+
+def save_report(root: str | pathlib.Path, report: "RunReport") -> pathlib.Path:
+    """Keep the run. A refuted run after two repair rounds contains the four
+    verdicts, the failing cases and every step -- throwing that away because the
+    line did not propose anything is throwing away the most useful output it
+    produced."""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = run_path(root, report.feature, stamp)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report.render(), encoding="utf-8", newline="\n")
+    return path
 
 
 # ── the runner seam ──────────────────────────────────────────────────────────

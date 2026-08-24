@@ -12,6 +12,45 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.3.0] — 2026-08-24
+
+Quality and ergonomics. No breaking changes: every existing command behaves as it
+did, and the additions are opt-in flags.
+
+### Added
+
+- **`fastpdlc validate --json`** — findings as structured output against a
+  `fastpdlc-report/1` schema. Diagnostic codes were already an API; making a
+  consumer regex the prose to find one defeated the point of having them.
+- **`fastpdlc evidence --verify RECORD`** — recomputes every digest in a record and
+  reports what no longer matches. Content-addressing is only worth something if
+  somebody can check it; producing a record nobody can verify is a claim, not
+  evidence. Needs no key, no trust in the issuer and no network.
+- **Orchestrator runs are kept** at `.fastpdlc/runs/<id>-<timestamp>.json`. A run
+  refuted after two repair rounds holds the four verdicts and their failing cases —
+  the most useful thing it produced. Discarding it because nothing was proposed was
+  backwards.
+- An **opt-in integration test** (`pytest -m integration`, needs `ANTHROPIC_API_KEY`)
+  that exercises one cheap station against the real endpoint. Everything else stubs
+  the model, which meant an API change would have broken users rather than CI.
+
+### Changed
+
+- **`PAC-060` now names what drifted.** "the bundle is stale" tells you to run a
+  command; "2 artifact(s) differ: +BR-idempotent, TERM-ledger" tells you whether it
+  is the change you meant to make, which is the question a reviewer actually has.
+  Additions are prefixed `+`, removals `-`.
+
+### Quality
+
+- Library coverage **72% → 90%**, 28 → 58 tests, concentrated where it was thinnest:
+  the CLI (30 → 80%), the plugin loader (62 → 97%), the coding sandbox (40 → 82%)
+  and the runners (52 → 81%).
+- Python 3.10 compatibility verified by parsing every module at that feature level,
+  rather than assumed from the classifier list.
+- `ruff` config and an 85% coverage floor in CI. The floor exists to stop coverage
+  rotting, not to be gamed upward.
+
 ## [0.2.1] — 2026-08-23
 
 Packaging only. No library changes — `0.2.0` and `0.2.1` are identical to import
@@ -106,7 +145,8 @@ verified by a byte-identical parity test.
 - LGPL-3.0-or-later: copyleft on the engine, and importing it as a library does not
   place your project under the LGPL.
 
-[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tarvitave/fastpdlc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/tarvitave/fastpdlc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tarvitave/fastpdlc/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tarvitave/fastpdlc/releases/tag/v0.1.0

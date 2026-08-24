@@ -109,6 +109,47 @@ def _is_empty(v: object) -> bool:
     return v is None or (isinstance(v, (str, list, dict)) and len(v) == 0)
 
 
+
+def _drift_summary(committed: str, expected: str) -> str:
+    """Name what actually changed, instead of only that something did.
+
+    "the bundle is stale" tells you to run a command. "3 artifacts changed:
+    TERM-payment, TERM-ledger, +BR-idempotent" tells you whether that is the change
+    you meant to make -- which is the question a reviewer actually has.
+    """
+    try:
+        old = json.loads(committed)
+        new = json.loads(expected)
+    except ValueError:
+        return "committed file is not valid JSON"
+
+    changed: list[str] = []
+    for name in sorted(set(old) | set(new)):
+        if name == "note":
+            continue
+        old_recs = old.get(name)
+        new_recs = new.get(name)
+        if not isinstance(old_recs, list) or not isinstance(new_recs, list):
+            if old_recs != new_recs:
+                changed.append(f"{name} (field)")
+            continue
+        old_by = {r.get("id"): r for r in old_recs if isinstance(r, dict)}
+        new_by = {r.get("id"): r for r in new_recs if isinstance(r, dict)}
+        for rid in sorted(set(old_by) | set(new_by), key=lambda x: (x is None, x)):
+            if rid not in old_by:
+                changed.append(f"+{rid}")
+            elif rid not in new_by:
+                changed.append(f"-{rid}")
+            elif old_by[rid] != new_by[rid]:
+                changed.append(str(rid))
+
+    if not changed:
+        return "content matches but the bytes differ (formatting or key order)"
+    shown = ", ".join(changed[:6])
+    more = f" and {len(changed) - 6} more" if len(changed) > 6 else ""
+    return f"{len(changed)} artifact(s) differ: {shown}{more}"
+
+
 def validate(config: Config, root: str | pathlib.Path = ".", registry=None) -> Report:
     """Run schema + id + reference + staleness checks (+ any plugin checks); return a Report."""
     report = Report()
@@ -165,8 +206,15 @@ def validate(config: Config, root: str | pathlib.Path = ".", registry=None) -> R
     out = pathlib.Path(root) / config.output
     if not out.exists():
         report.add("PAC-060", f"{config.output} is missing — run: fastpdlc build")
-    elif out.read_text(encoding="utf-8") != render_bundle(config, root, registry):
-        report.add("PAC-060", f"{config.output} is stale — run: fastpdlc build (and commit it)")
+    else:
+        committed = out.read_text(encoding="utf-8")
+        expected = render_bundle(config, root, registry)
+        if committed != expected:
+            report.add(
+                "PAC-060",
+                f"{config.output} is stale — {_drift_summary(committed, expected)}"
+                f" — run: fastpdlc build (and commit it)",
+            )
 
     # extra committed outputs (e.g. a runtime catalogue) — same staleness gate.
     if registry:

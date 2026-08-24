@@ -146,3 +146,49 @@ def render(record: dict) -> str:
     """Stable serialisation, so two runs on one commit produce identical bytes
     apart from generated_at."""
     return json.dumps(record, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+
+
+def verify(record: dict, root: str | pathlib.Path = ".") -> list[str]:
+    """Recompute every digest in a record and report what no longer matches.
+
+    Content-addressing is only worth anything if somebody can check it. Producing
+    a record nobody can verify is a claim, not evidence -- so this is the other
+    half of `build_record`, and it needs no key, no trust in the issuer, and no
+    network.
+
+    Returns an empty list when the record still describes the tree on disk.
+    """
+    root_path = pathlib.Path(root).resolve()
+    problems: list[str] = []
+
+    if record.get("schema") != SCHEMA:
+        problems.append(f"unknown schema: {record.get('schema')!r} (expected {SCHEMA})")
+        return problems
+
+    for collection, entries in (record.get("artifacts") or {}).items():
+        for entry in entries:
+            rel = entry.get("file") or ""
+            expected = entry.get("sha256")
+            actual = _sha256(root_path / rel)
+            if actual is None:
+                problems.append(f"{collection}: {rel} is missing")
+            elif expected != actual:
+                problems.append(f"{collection}: {rel} changed since the record was made")
+
+    bundle = record.get("bundle") or {}
+    if bundle.get("path"):
+        actual = _sha256(root_path / bundle["path"])
+        if actual is None:
+            problems.append(f"bundle {bundle['path']} is missing")
+        elif actual != bundle.get("sha256"):
+            problems.append(f"bundle {bundle['path']} changed since the record was made")
+
+    repo = record.get("repository") or {}
+    if repo.get("tracked") and repo.get("commit"):
+        head = _git(root_path, "rev-parse", "HEAD")
+        if head and head != repo["commit"]:
+            problems.append(
+                f"the record was made at {repo['commit'][:12]}, the tree is at {head[:12]}"
+            )
+
+    return problems

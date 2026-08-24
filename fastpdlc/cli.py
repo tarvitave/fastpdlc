@@ -26,13 +26,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("-p", "--plugin", default=None, help="project plugin module or .py file")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("build", help="regenerate the committed JSON bundle(s)")
-    sub.add_parser("validate", help="schema + graph + staleness checks (CI gate)")
+    val = sub.add_parser("validate", help="schema + graph + staleness checks (CI gate)")
+    val.add_argument("--json", action="store_true", dest="as_json",
+                     help="emit findings as JSON — codes are an API, so make them parseable")
     ev = sub.add_parser(
         "evidence",
         help="emit a content-addressed record of what was checked, when, and on what",
     )
     ev.add_argument("-o", "--output", default=None,
                     help="write the record here instead of stdout")
+    ev.add_argument("--verify", metavar="RECORD", default=None,
+                    help="recompute the digests in an existing record instead of making one")
 
     orc = sub.add_parser(
         "orchestrate",
@@ -116,6 +120,9 @@ def main(argv: list[str] | None = None) -> int:
                   file=sys.stderr)
             print(f"Answer them in {path}, then run this again.", file=sys.stderr)
 
+        saved = orchestration.save_report(args.root, report)
+        print(f"── run saved to {saved}", file=sys.stderr)
+
         text = report.render()
         if args.output:
             out = pathlib.Path(args.root) / args.output
@@ -129,6 +136,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.status == "proposed" else 1
 
     if args.cmd == "evidence":
+        if args.verify:
+            path = pathlib.Path(args.root) / args.verify
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                print(f"cannot read {path}: {exc}", file=sys.stderr)
+                return 2
+            problems = evidence.verify(record, args.root)
+            if problems:
+                print(f"EVIDENCE DOES NOT MATCH THIS TREE — {len(problems)} problem(s)\n")
+                for problem in problems:
+                    print(f"  {problem}")
+                return 1
+            made = record.get("generated_at", "?")
+            print(f"evidence verified: every digest still matches (recorded {made})")
+            return 0
+
         record = evidence.build_record(config, args.root, registry)
         text = evidence.render(record)
         if args.output:
@@ -143,11 +167,37 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if record["result"] == "fail" else 0
 
     report = engine.validate(config, args.root, registry)
+    counts = {name: len(recs) for name, recs in engine.load(config, args.root).items()}
+
+    if getattr(args, "as_json", False):
+        # Diagnostics are an API. Making a consumer regex the prose to find a code
+        # defeats the point of having stable codes at all.
+        json.dump(
+            {
+                "schema": "fastpdlc-report/1",
+                "result": "pass" if report.ok else "fail",
+                "counts": counts,
+                "errors": len(report.errors),
+                "warnings": len(report.warnings),
+                "findings": [
+                    {
+                        "code": d.code,
+                        "severity": d.severity,
+                        "where": d.where,
+                        "message": d.message,
+                    }
+                    for d in report.diagnostics
+                ],
+            },
+            sys.stdout, indent=2, ensure_ascii=False, sort_keys=True,
+        )
+        sys.stdout.write("\n")
+        return 1 if report.errors else 0
+
     for w in report.warnings:
         print(f"WARN  {w.render()}")
     for e in report.errors:
         print(f"ERROR {e.render()}")
-    counts = {name: len(recs) for name, recs in engine.load(config, args.root).items()}
     summary = ", ".join(f"{n} {c}" for n, c in counts.items())
     print(
         f"\nfastpdlc: {summary} — "
