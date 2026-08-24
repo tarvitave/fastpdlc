@@ -21,6 +21,9 @@ python tools/render_blog.py
 python tools/render_pages.py
 python tools/fingerprint_assets.py
 
+echo "→ site structure gate"
+python tools/check_site.py || { echo "refusing to deploy a broken page"; exit 1; }
+
 echo "→ syncing to ${HOST}:${REMOTE_DIR}"
 rsync -az --delete \
   --exclude '.env' \

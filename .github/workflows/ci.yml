@@ -21,6 +21,16 @@ jobs:
 
       - name: Unit tests
         run: pytest -q
+      - name: Site structure gate
+        run: python site/tools/check_site.py
+
+      - name: Dogfood — the blog must validate as product-as-code
+        run: |
+          cd site/content
+          fastpdlc build
+          git diff --exit-code build/             || { echo "::error::blog bundle is stale — run fastpdlc build"; exit 1; }
+          fastpdlc validate
+
       - name: Dogfood — the quickstart example must validate
         run: |
           fastpdlc -C examples/quickstart build
