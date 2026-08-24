@@ -101,8 +101,9 @@ _CROSS_SYSTEM = (
     "You are an adversarial code reviewer. Try to REFUTE the change -- default to "
     "refuted=true if you are not convinced it is correct and safe. Reply with STRICT "
     "JSON only, no prose and no markdown fences, matching exactly: "
-    '{"lens":"%s","refuted":<bool>,"severity":"blocker|major|minor|none",'
-    '"reason":<string>,"failing_case":<string>}' % CROSS_PROVIDER_LENS
+    '{"lens":"' + CROSS_PROVIDER_LENS + '","refuted":<bool>,'
+    '"severity":"blocker|major|minor|none",'
+    '"reason":<string>,"failing_case":<string>}'
 )
 
 

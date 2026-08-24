@@ -25,8 +25,9 @@ import concurrent.futures
 import dataclasses
 import json
 import pathlib
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 # ── the roster ───────────────────────────────────────────────────────────────
 AGENT, HUMAN, MACHINE = "agent", "human", "machine"
@@ -167,7 +168,7 @@ class Verdict:
         return self.refuted and self.severity in BLOCKING
 
     @classmethod
-    def from_dict(cls, data: dict, lens: str) -> "Verdict":
+    def from_dict(cls, data: dict, lens: str) -> Verdict:
         severity = data.get("severity")
         if severity not in SEVERITIES:
             severity = "major" if data.get("refuted") else "none"
@@ -180,7 +181,7 @@ class Verdict:
         )
 
     @classmethod
-    def benign(cls, lens: str, why: str) -> "Verdict":
+    def benign(cls, lens: str, why: str) -> Verdict:
         """An unreachable critic must never block the line -- it just abstains."""
         return cls(lens, False, "none",
                    f"lens inconclusive ({why}); the remaining lenses stand.")
@@ -280,7 +281,7 @@ def run_path(root: str | pathlib.Path, feature: str, stamp: str) -> pathlib.Path
     return pathlib.Path(root) / ".fastpdlc" / "runs" / f"{feature}-{stamp}.json"
 
 
-def save_report(root: str | pathlib.Path, report: "RunReport") -> pathlib.Path:
+def save_report(root: str | pathlib.Path, report: RunReport) -> pathlib.Path:
     """Keep the run. A refuted run after two repair rounds contains the four
     verdicts, the failing cases and every step -- throwing that away because the
     line did not propose anything is throwing away the most useful output it
@@ -354,7 +355,7 @@ def _fanout(tasks: list[Callable[[], Any]], workers: int = 4) -> list[Any]:
             index = futures[future]
             try:
                 results[index] = future.result()
-            except Exception as exc:                       # noqa: BLE001
+            except Exception as exc:
                 results[index] = {"_error": str(exc)}
     return results
 
@@ -385,7 +386,7 @@ class Orchestrator:
         try:
             data = self.runner.run(station, prompt, schema)
             return StepResult(station.id, phase, True, data)
-        except Exception as exc:                           # noqa: BLE001
+        except Exception as exc:
             return StepResult(station.id, phase, False, {}, str(exc))
 
     def understand(self, feature: str) -> StepResult:
@@ -490,7 +491,7 @@ class Orchestrator:
 
         raw = _fanout(tasks, workers=len(tasks))
         out: list[Verdict] = []
-        for lens, result in zip(names, raw):
+        for lens, result in zip(names, raw, strict=True):
             if isinstance(result, Verdict):
                 out.append(result)
             else:

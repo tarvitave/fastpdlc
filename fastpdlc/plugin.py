@@ -30,8 +30,8 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import pathlib
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 # A validator receives the loaded bundle, the config, the root path, and the Report
 # to append diagnostics to. A bundle_transformer mutates the bundle in place before

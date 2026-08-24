@@ -4,17 +4,16 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-
-import pytest
 import sys
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from fastpdlc import build, register, render_bundle, validate  # noqa: E402
-from fastpdlc.config import ArtifactType, Config, Reference  # noqa: E402
-from fastpdlc.plugin import Registry  # noqa: E402
+from fastpdlc import build, register, render_bundle, validate
+from fastpdlc.config import ArtifactType, Config, Reference
+from fastpdlc.plugin import Registry
 
 
 def _write(root: pathlib.Path, rel: str, meta: dict, body: str = "body") -> None:
@@ -122,13 +121,15 @@ def test_plugin_validator_and_transformer_and_output(tmp_path):
     def add_count(bundle, config, root):
         bundle["term_count"] = len(bundle["terms"])
 
-    reg.extra_output("build/catalogue.json", lambda bundle, config, root: '{"n": %d}\n' % bundle["term_count"])
+    reg.extra_output(
+        "build/catalogue.json",
+        lambda bundle, config, root: json.dumps({"n": bundle["term_count"]}) + "\n",
+    )
 
     written = build(cfg, tmp_path, reg)
     assert (tmp_path / "build" / "catalogue.json").exists()
     assert len(written) == 2  # main bundle + extra output
     # the transformer field is in the bundle
-    import json
     assert json.loads((tmp_path / "build" / "b.json").read_text())["term_count"] == 1
     # validate is clean (bodies present, outputs fresh)
     assert validate(cfg, tmp_path, reg).ok
@@ -355,7 +356,7 @@ def test_minor_findings_do_not_block():
 
 def test_a_failed_lens_abstains_rather_than_blocking():
     """An unreachable critic must never take down the line."""
-    from fastpdlc.orchestration import Orchestrator, Station, VERDICT_SCHEMA
+    from fastpdlc.orchestration import VERDICT_SCHEMA, Orchestrator
 
     class Flaky:
         def run(self, station, prompt, schema=None):
@@ -483,8 +484,7 @@ def test_cross_provider_verdict_joins_the_refute_logic():
 def test_disambiguation_file_is_the_two_phase_gate(tmp_path):
     """pharthing parks these in a console; a library cannot assume a service, so the
     same gate is a file. Run 1 blocks and writes it, a human answers, run 2 proceeds."""
-    from fastpdlc.orchestration import (Orchestrator, StubRunner, read_resolutions,
-                                        write_questions)
+    from fastpdlc.orchestration import Orchestrator, StubRunner, read_resolutions, write_questions
 
     questions = [{"id": "q1", "dimension": "refund window start", "question": "?"}]
 
@@ -753,7 +753,8 @@ def test_cli_build_is_deterministic_across_runs(tmp_path):
 
 # ── the model-facing runners, with a fake client ────────────────────────────
 class _Block:
-    def __init__(self, text): self.type, self.text = "text", text
+    def __init__(self, text):
+        self.type, self.text = "text", text
 
 
 class _ToolBlock:
@@ -763,11 +764,13 @@ class _ToolBlock:
 
 class _Resp:
     def __init__(self, content, stop_reason="end_turn"):
-        self.content, self.stop_reason = content, stop_reason
+        self.content = content
+        self.stop_reason = stop_reason
 
 
 class _FakeMessages:
-    def __init__(self, script): self.script, self.calls = list(script), []
+    def __init__(self, script):
+        self.script, self.calls = list(script), []
 
     def create(self, **kw):
         self.calls.append(kw)
@@ -775,13 +778,14 @@ class _FakeMessages:
 
 
 class _FakeClient:
-    def __init__(self, script): self.messages = _FakeMessages(script)
+    def __init__(self, script):
+        self.messages = _FakeMessages(script)
 
 
 def test_claude_runner_sends_the_station_model_and_effort(monkeypatch):
     """Per-station model policy is the cost/correctness dial. If every station
     silently inherited one default, the dial would not exist."""
-    from fastpdlc.orchestration import DESIGN_SCHEMA, BY_ID
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
     from fastpdlc.runners import ClaudeRunner
 
     runner = ClaudeRunner(api_key="test")
@@ -860,7 +864,8 @@ def test_coding_runner_refuses_to_escape_the_root(tmp_path):
     from fastpdlc.coding import CodingRunner
     from fastpdlc.orchestration import BY_ID, DEVELOP_SCHEMA
 
-    root = tmp_path / "project"; root.mkdir()
+    root = tmp_path / "project"
+    root.mkdir()
     (tmp_path / "outside.txt").write_text("secret\n", encoding="utf-8")
 
     runner = CodingRunner(root=root, write=True, api_key="test")
@@ -906,9 +911,12 @@ def test_coding_runner_delegates_other_stations(tmp_path):
     from fastpdlc.orchestration import BY_ID
 
     class Recorder:
-        def __init__(self): self.seen = []
+        def __init__(self):
+            self.seen = []
+
         def run(self, station, prompt, schema=None):
-            self.seen.append(station.id); return {"ok": True}
+            self.seen.append(station.id)
+            return {"ok": True}
 
     rec = Recorder()
     runner = CodingRunner(root=tmp_path, api_key="test", fallback=rec)
@@ -929,7 +937,7 @@ def test_a_real_station_returns_the_declared_shape():
     Deliberately ST-01 (haiku, low effort) and a trivial prompt: enough to exercise
     the request shape and the structured-output contract, cheap enough to run often.
     """
-    from fastpdlc.orchestration import DISAMBIGUATION_SCHEMA, BY_ID
+    from fastpdlc.orchestration import BY_ID, DISAMBIGUATION_SCHEMA
     from fastpdlc.runners import ClaudeRunner
 
     runner = ClaudeRunner()

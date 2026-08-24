@@ -61,7 +61,7 @@ def _repository(root: pathlib.Path) -> dict:
         # A dirty tree means the record describes files that are not committed
         # anywhere. Say so loudly rather than let it be inferred.
         "clean": status == "",
-        "uncommitted_files": len([l for l in (status or "").splitlines() if l.strip()]),
+        "uncommitted_files": len([line for line in (status or "").splitlines() if line.strip()]),
     }
 
 

@@ -23,13 +23,15 @@ from __future__ import annotations
 from .config import ArtifactType, Config, Reference, load_config
 from .diagnostics import CODES, Diagnostic, Report, register
 from .engine import build, load, render_bundle, validate
-from .evidence import build_record, render as render_evidence, verify as verify_evidence
+from .evidence import build_record
+from .evidence import render as render_evidence
+from .evidence import verify as verify_evidence
 from .orchestration import (
     LENSES,
     ROSTER,
     Orchestrator,
-    RunReport,
     Runner,
+    RunReport,
     Station,
     StubRunner,
     Verdict,
@@ -42,39 +44,39 @@ from .plugin import Registry, load_plugin
 __version__ = "0.3.0"
 
 __all__ = [
-    # config
-    "ArtifactType",
-    "Config",
-    "Reference",
-    "load_config",
     # diagnostics
     "CODES",
-    "Diagnostic",
-    "Report",
-    "register",
-    # engine
-    "build",
-    "load",
-    "render_bundle",
-    "validate",
-    # evidence
-    "build_record",
-    "render_evidence",
-    "verify_evidence",
     # the agent-built lifecycle
     "LENSES",
     "ROSTER",
+    # config
+    "ArtifactType",
+    "Config",
+    "Diagnostic",
     "Orchestrator",
+    "Reference",
+    # plugins
+    "Registry",
+    "Report",
     "RunReport",
     "Runner",
     "Station",
     "StubRunner",
     "Verdict",
-    "read_resolutions",
-    "save_report",
-    "write_questions",
-    # plugins
-    "Registry",
-    "load_plugin",
     "__version__",
+    # engine
+    "build",
+    # evidence
+    "build_record",
+    "load",
+    "load_config",
+    "load_plugin",
+    "read_resolutions",
+    "register",
+    "render_bundle",
+    "render_evidence",
+    "save_report",
+    "validate",
+    "verify_evidence",
+    "write_questions",
 ]
