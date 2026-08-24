@@ -12,6 +12,25 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.3.1] — 2026-08-24
+
+Housekeeping. **No behaviour change** — `0.3.0` and `0.3.1` are identical to import
+and run, and the only differences are import ordering and variable names.
+
+`0.3.0` was published from a commit whose CI was failing. A `ruff` gate was added to
+CI without the code having been made to pass it first, so the lint step went red on
+its very first run — while the publish was in flight. Nothing shipped broken: all 58
+tests passed throughout and every finding was style rather than behaviour. But a
+released tag should point at green CI, so this is that tag.
+
+### Changed
+
+- Lint clean under `ruff`. Two of the fixes earn their place rather than merely
+  silencing a rule: `zip()` over the lens names and their results now passes
+  `strict=True`, which is a real assertion that the two lists cannot silently
+  diverge, and the variable `l` is renamed because it is indistinguishable from `1`
+  in most fonts.
+
 ## [0.3.0] — 2026-08-24
 
 Quality and ergonomics. No breaking changes: every existing command behaves as it
@@ -145,7 +164,8 @@ verified by a byte-identical parity test.
 - LGPL-3.0-or-later: copyleft on the engine, and importing it as a library does not
   place your project under the LGPL.
 
-[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tarvitave/fastpdlc/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/tarvitave/fastpdlc/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/tarvitave/fastpdlc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/tarvitave/fastpdlc/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tarvitave/fastpdlc/compare/v0.1.0...v0.2.0
