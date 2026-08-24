@@ -167,7 +167,10 @@ def page(title: str, desc: str, body: str, canonical: str, extra_head: str = "")
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(desc)}">
 <meta property="og:url" content="https://fastpdlc.com{canonical}">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://fastpdlc.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <link rel="icon" href="{FAVICON}">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/blog.css">

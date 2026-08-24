@@ -1,0 +1,143 @@
+# External uptime + certificate monitoring for fastpdlc.com.
+#
+# Deliberately NOT on the server. A checker that lives on the box it is checking
+# cannot tell you the box is down, which is the one failure you most need to hear
+# about. GitHub runs this from outside, so a dead host, a wedged container and a
+# failing certificate renewal all surface the same way: a red run, which GitHub
+# emails you about.
+#
+# It also opens and reuses a single labelled issue, so an outage is visible without
+# watching the Actions tab and does not spam a new issue every fifteen minutes.
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe the public surface
+        id: probe
+        run: |
+          set -uo pipefail
+          FAIL=0
+          REPORT=""
+
+          note() { REPORT="${REPORT}\n- $1"; FAIL=1; }
+
+          check() {
+            local path="$1" want="$2" code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://fastpdlc.com${path}" 2>/dev/null || echo "000")
+            if [ "$code" = "$want" ]; then
+              echo "  ok    ${path} -> ${code}"
+            else
+              echo "  FAIL  ${path} -> ${code} (expected ${want})"
+              note "\`${path}\` returned **${code}**, expected ${want}"
+            fi
+          }
+
+          echo "== endpoints =="
+          check "/"               200
+          check "/blog/"          200
+          check "/lifecycle.html" 200
+          check "/api/health"     200
+          check "/admin/login"    200
+          check "/nope-404-probe" 404
+
+          echo "== the admin panel must stay shut =="
+          ADMIN=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -H 'Accept: application/json' https://fastpdlc.com/admin/ 2>/dev/null || echo "000")
+          if [ "$ADMIN" = "401" ]; then
+            echo "  ok    /admin/ unauthenticated -> 401"
+          else
+            echo "  FAIL  /admin/ unauthenticated -> ${ADMIN} (expected 401)"
+            note "\`/admin/\` returned **${ADMIN}** to an unauthenticated request, expected 401"
+          fi
+
+          echo "== TLS certificate =="
+          END=$(echo | openssl s_client -servername fastpdlc.com -connect fastpdlc.com:443 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+          if [ -z "$END" ]; then
+            echo "  FAIL  could not read the certificate"
+            note "TLS handshake failed — could not read the certificate at all"
+          else
+            DAYS=$(( ( $(date -d "$END" +%s) - $(date +%s) ) / 86400 ))
+            echo "  certificate expires in ${DAYS} day(s) (${END})"
+            if [ "$DAYS" -lt 10 ]; then
+              note "TLS certificate expires in **${DAYS} days** (Caddy renews at 30, so renewal is failing)"
+            fi
+          fi
+
+          {
+            echo "report<<PROBE_EOF"
+            printf '%b\n' "${REPORT}"
+            echo "PROBE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          exit "$FAIL"
+
+      - name: Open or update the outage issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = `${{ steps.probe.outputs.report }}`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `Probe failed at ${new Date().toISOString()}.`,
+              ``,
+              report || `_(no detail captured — see the run log)_`,
+              ``,
+              `[Run log](${runUrl})`,
+              ``,
+              `_This issue is reused rather than duplicated, and closes on the next green probe._`,
+            ].join("\n");
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: "uptime",
+            });
+
+            if (existing.data.length) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.data[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: "fastpdlc.com is failing its uptime probe",
+                body, labels: ["uptime"],
+              });
+            }
+
+      - name: Close the outage issue once it recovers
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: "uptime",
+            });
+            for (const issue of existing.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Recovered — probe green at ${new Date().toISOString()}.`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number, state: "closed",
+              });
+            }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>FastPDLC — social card</title>
-<link rel="stylesheet" href="/styles.css?v=183d92d9d5">
+<link rel="stylesheet" href="/styles.css?v=ef971950ff">
 <style>
   /* Exactly the OG card size. Render this page to og.png at 1200x630. */
   html, body { background: #fff; }
@@ -13,12 +13,14 @@
     display: grid; grid-template-rows: auto 1fr auto;
     padding: 56px 64px; gap: 24px;
   }
-  .og h1 { font-family: var(--display); font-size: 104px; line-height: 0.94; max-width: 16ch; }
+  .og h1 { font-family: var(--display); font-size: 82px; line-height: 0.94; max-width: 16ch; }
   .og .hl { padding-inline: 0.08em;
     background-image: linear-gradient(transparent 52%, var(--yellow) 52%, var(--yellow) 88%, transparent 88%); }
   .og p { font-size: 27px; font-weight: 500; max-width: 30ch; color: #333; }
   .og-top { display: flex; align-items: center; justify-content: space-between; }
-  .og-top .logo-mark { font-size: 34px; padding: 10px 16px; }
+    .og-logo { display: inline-flex; align-items: center; gap: 12px; }
+  .og-logo .logo-glyph { width: 46px; height: 46px; filter: drop-shadow(3px 3px 0 var(--ink)); }
+  .og-logo b { font-family: var(--display); font-size: 36px; letter-spacing: 0.3px; }
   .og-codes { display: flex; gap: 12px; }
   .og-codes span {
     font-family: var(--mono); font-size: 17px; font-weight: 600;
@@ -37,7 +39,7 @@
 <body>
 <div class="og">
   <div class="og-top">
-    <span class="logo-mark">FastPDLC</span>
+    <span class="og-logo"><svg class='logo-glyph' viewBox='0 0 40 40' aria-hidden='true'><rect x='1.6' y='1.6' width='36.8' height='36.8' rx='9' fill='#191919'/><path d='M10.5 21.5 L17 28 L29.5 12.5' fill='none' stroke='#fbcc00' stroke-width='4.2' stroke-linecap='round' stroke-linejoin='round'/><circle cx='10.5' cy='21.5' r='3.6' fill='#fff'/><circle cx='29.5' cy='12.5' r='3.6' fill='#00b67a'/></svg><b>FastPDLC</b></span>
     <div class="og-codes">
       <span style="background:#ff6b4a">PAC-001</span>
       <span style="background:#4a90e2">PAC-020</span>
@@ -46,9 +48,9 @@
   </div>
 
   <div>
-    <h1>Your product spec, <span class="hl">compiled.</span></h1>
-    <p style="margin-top:22px">Typed artifacts, a validated reference graph, and a CI gate that
-      goes red the moment your spec and your product disagree.</p>
+    <h1>A workforce builds it.<br>A <span class="hl">gate judges it.</span></h1>
+    <p style="margin-top:22px">Typed product artifacts beside your code. Agents propose,
+      a deterministic gate enforces, a human merges.</p>
   </div>
 
   <div class="og-bottom">

@@ -39,13 +39,6 @@ www.{$SITE_DOMAIN} {
 		}
 	}
 
-	# ── self-hosted analytics, only routed when the profile is running ───
-	# Serving it from our own origin means no third-party requests and no
-	# ad-blocker breakage. Remove this block if you don't run the profile.
-	handle /stats/* {
-		uri strip_prefix /stats
-		reverse_proxy umami:3000
-	}
 
 	# ── the static site ──────────────────────────────────────────────────
 	handle {
