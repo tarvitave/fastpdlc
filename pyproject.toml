@@ -57,3 +57,32 @@ only-include = [
   "LICENSE",
   "pyproject.toml",
 ]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Deliberately not the kitchen sink. Each of these has caught something real in
+# this codebase or would have: unused imports, shadowed builtins, mutable default
+# arguments, bare excepts, f-strings that are not.
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]
+ignore = [
+  "E501",    # line length is handled by the formatter, not the linter
+  "SIM108",  # ternaries are not always clearer than an if
+  "B008",    # FastAPI's Depends()/Form() in defaults is the documented idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]        # imports inside tests are deliberate and local
+
+[tool.coverage.run]
+source = ["fastpdlc"]
+omit = ["*/__pycache__/*"]
+
+[tool.coverage.report]
+# A floor, not a target. It exists to stop coverage silently rotting, not to be
+# gamed upward -- the modules that matter are already well above it.
+fail_under = 85
+show_missing = true

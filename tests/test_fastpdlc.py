@@ -503,3 +503,414 @@ def test_disambiguation_file_is_the_two_phase_gate(tmp_path):
                           ).run("FEAT-refunds")
     assert second.status == "proposed"
     assert "ST-03" in [s.station for s in second.steps]
+
+
+# ── the plugin loader: the extension point everything else hangs off ─────────
+def _plugin_project(tmp_path):
+    (tmp_path / "product" / "features").mkdir(parents=True)
+    (tmp_path / "product" / "features" / "FEAT-refunds.md").write_text(
+        "---\nid: FEAT-refunds\ntitle: Refunds\ncode: [src/refunds.py, src/gone.py]\n---\nBody.\n",
+        encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "refunds.py").write_text("# real\n", encoding="utf-8")
+    (tmp_path / "product.config.yaml").write_text(
+        "product_dir: product\n"
+        "output: build/out.json\n"
+        "types:\n"
+        "  - name: features\n"
+        "    dir: features\n"
+        "    id_prefix: 'FEAT-'\n"
+        "    required: [id, title]\n"
+        "    fields: [title, code]\n",
+        encoding="utf-8")
+    from fastpdlc.config import load_config
+    return load_config(str(tmp_path / "product.config.yaml"))
+
+
+PLUGIN_SRC = r'''
+from fastpdlc import register
+
+def register_codes():
+    register("PAC-900", "links.code path does not exist on disk")
+
+def register(reg):
+    from fastpdlc.diagnostics import register as reg_code
+    reg_code("PAC-900", "links.code path does not exist on disk")
+
+    @reg.validator
+    def code_paths_exist(bundle, config, root, report):
+        for f in bundle["features"]:
+            for path in f.get("code") or []:
+                if not (root / path).exists():
+                    report.add("PAC-900", f"missing {path}", f["_file"])
+
+    @reg.bundle_transformer
+    def stamp(bundle, config, root):
+        bundle["_stamped"] = True
+
+    reg.extra_output("build/catalogue.json", lambda bundle, config, root: "{}\n")
+'''
+
+
+def test_plugin_loads_from_a_file_and_its_validator_runs(tmp_path):
+    """The documented plugin path -- fastpdlc -p product_hooks.py -- and the exact
+    PAC-900 example from the README."""
+    from fastpdlc import engine
+    from fastpdlc.plugin import load_plugin
+
+    config = _plugin_project(tmp_path)
+    (tmp_path / "hooks.py").write_text(PLUGIN_SRC, encoding="utf-8")
+    registry = load_plugin(str(tmp_path / "hooks.py"))
+
+    assert len(registry.validators) == 1
+    assert len(registry.bundle_transformers) == 1
+    assert len(registry.extra_outputs) == 1
+
+    engine.build(config, str(tmp_path), registry)
+    report = engine.validate(config, str(tmp_path), registry)
+
+    codes = [d.code for d in report.diagnostics]
+    assert "PAC-900" in codes
+    finding = next(d for d in report.diagnostics if d.code == "PAC-900")
+    assert "src/gone.py" in finding.message
+    assert "src/refunds.py" not in finding.message      # the one that exists is fine
+
+
+def test_plugin_bundle_transformer_reaches_the_committed_bundle(tmp_path):
+    from fastpdlc import engine
+    from fastpdlc.plugin import load_plugin
+
+    config = _plugin_project(tmp_path)
+    (tmp_path / "hooks.py").write_text(PLUGIN_SRC, encoding="utf-8")
+    registry = load_plugin(str(tmp_path / "hooks.py"))
+
+    engine.build(config, str(tmp_path), registry)
+    bundle = json.loads((tmp_path / "build" / "out.json").read_text(encoding="utf-8"))
+    assert bundle["_stamped"] is True
+
+
+def test_plugin_extra_outputs_are_staleness_gated(tmp_path):
+    """A generated file nothing verifies is a generated file that will fall behind.
+    Plugin outputs get the same PAC-060 treatment as the bundle."""
+    from fastpdlc import engine
+    from fastpdlc.plugin import load_plugin
+
+    config = _plugin_project(tmp_path)
+    (tmp_path / "hooks.py").write_text(PLUGIN_SRC, encoding="utf-8")
+    registry = load_plugin(str(tmp_path / "hooks.py"))
+
+    engine.build(config, str(tmp_path), registry)
+    assert (tmp_path / "build" / "catalogue.json").exists()
+
+    (tmp_path / "build" / "catalogue.json").write_text("tampered\n", encoding="utf-8")
+    report = engine.validate(config, str(tmp_path), registry)
+    stale = [d for d in report.errors if d.code == "PAC-060" and "catalogue" in d.message]
+    assert stale, "a tampered plugin output must fail PAC-060"
+
+
+def test_no_plugin_yields_an_empty_registry():
+    from fastpdlc.plugin import load_plugin
+    for spec in (None, ""):
+        reg = load_plugin(spec)
+        assert reg.validators == [] and reg.bundle_transformers == []
+
+
+def test_a_plugin_without_register_fails_loudly(tmp_path):
+    """Silently ignoring a plugin that does not register anything would let a
+    project believe its checks are running when they are not."""
+    from fastpdlc.plugin import load_plugin
+
+    (tmp_path / "empty.py").write_text("x = 1\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        load_plugin(str(tmp_path / "empty.py"))
+    assert "register" in str(exc.value)
+
+
+# ── the CLI: exit codes are the contract ────────────────────────────────────
+def _cli_project(tmp_path):
+    (tmp_path / "product" / "terms").mkdir(parents=True)
+    (tmp_path / "product" / "terms" / "TERM-payment.md").write_text(
+        "---\nid: TERM-payment\nterm: Payment\ndefinition: Moving money.\n"
+        "see_also: [TERM-ledger]\n---\nBody.\n", encoding="utf-8")
+    (tmp_path / "product" / "terms" / "TERM-ledger.md").write_text(
+        "---\nid: TERM-ledger\nterm: Ledger\ndefinition: The record.\n---\nBody.\n",
+        encoding="utf-8")
+    (tmp_path / "product.config.yaml").write_text(
+        "product_dir: product\n"
+        "output: build/out.json\n"
+        "types:\n"
+        "  - name: terms\n"
+        "    dir: terms\n"
+        "    id_prefix: 'TERM-'\n"
+        "    required: [id, term, definition]\n"
+        "    fields: [term, definition, see_also]\n"
+        "    references:\n"
+        "      - field: see_also\n"
+        "        to: terms\n",
+        encoding="utf-8")
+    return tmp_path
+
+
+def test_cli_build_then_validate_exits_zero(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    assert main(["-C", str(root), "build"]) == 0
+    assert (root / "build" / "out.json").exists()
+    assert main(["-C", str(root), "validate"]) == 0
+
+    out = capsys.readouterr().out
+    assert "terms 2" in out
+    assert "0 error(s)" in out
+
+
+def test_cli_validate_exits_nonzero_on_a_dangling_reference(tmp_path, capsys):
+    """The exit code IS the gate. If this ever returns 0 with errors present, every
+    CI job using FastPDLC goes green while broken."""
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    (root / "product" / "terms" / "TERM-ledger.md").unlink()      # break the graph
+
+    assert main(["-C", str(root), "validate"]) == 1
+    out = capsys.readouterr().out
+    assert "PAC-020" in out
+    assert "PAC-060" in out            # the bundle is now stale too
+
+
+def test_cli_validate_exits_nonzero_when_the_bundle_is_missing(tmp_path):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    assert main(["-C", str(root), "validate"]) == 1     # never built
+
+
+def test_cli_evidence_writes_a_record_and_follows_the_gate(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    capsys.readouterr()
+
+    assert main(["-C", str(root), "evidence", "-o", "build/ev.json"]) == 0
+    record = json.loads((root / "build" / "ev.json").read_text(encoding="utf-8"))
+    assert record["result"] == "pass"
+    assert record["counts"] == {"terms": 2}
+
+    # break it: evidence still records, but must not report success
+    (root / "product" / "terms" / "TERM-ledger.md").unlink()
+    assert main(["-C", str(root), "evidence", "-o", "build/ev2.json"]) == 1
+    broken = json.loads((root / "build" / "ev2.json").read_text(encoding="utf-8"))
+    assert broken["result"] == "fail"
+
+
+def test_cli_evidence_to_stdout_is_valid_json(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    capsys.readouterr()
+
+    main(["-C", str(root), "evidence"])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema"] == "fastpdlc-evidence/1"
+
+
+def test_cli_orchestrate_dry_run_needs_no_network(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    capsys.readouterr()
+
+    assert main(["-C", str(root), "orchestrate", "TERM-payment", "--dry-run"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "proposed"
+    assert [v["lens"] for v in report["verdicts"]] == [
+        "correctness", "coverage", "security", "reproduce"]
+
+
+def test_cli_rejects_a_malformed_resolve_flag(tmp_path, capsys):
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    assert main(["-C", str(root), "orchestrate", "FEAT-x", "--dry-run",
+                 "--resolve", "no-equals-sign"]) == 2
+
+
+def test_cli_build_is_deterministic_across_runs(tmp_path):
+    """Byte-stability is what makes PAC-060 and the evidence record trustworthy."""
+    from fastpdlc.cli import main
+
+    root = _cli_project(tmp_path)
+    main(["-C", str(root), "build"])
+    first = (root / "build" / "out.json").read_bytes()
+    main(["-C", str(root), "build"])
+    assert (root / "build" / "out.json").read_bytes() == first
+
+
+# ── the model-facing runners, with a fake client ────────────────────────────
+class _Block:
+    def __init__(self, text): self.type, self.text = "text", text
+
+
+class _ToolBlock:
+    def __init__(self, name, inp, bid="t1"):
+        self.type, self.name, self.input, self.id = "tool_use", name, inp, bid
+
+
+class _Resp:
+    def __init__(self, content, stop_reason="end_turn"):
+        self.content, self.stop_reason = content, stop_reason
+
+
+class _FakeMessages:
+    def __init__(self, script): self.script, self.calls = list(script), []
+
+    def create(self, **kw):
+        self.calls.append(kw)
+        return self.script.pop(0)
+
+
+class _FakeClient:
+    def __init__(self, script): self.messages = _FakeMessages(script)
+
+
+def test_claude_runner_sends_the_station_model_and_effort(monkeypatch):
+    """Per-station model policy is the cost/correctness dial. If every station
+    silently inherited one default, the dial would not exist."""
+    from fastpdlc.orchestration import DESIGN_SCHEMA, BY_ID
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner(api_key="test")
+    runner._client = _FakeClient([_Resp([_Block('{"approach":"a","files":[],'
+                                                '"criteria_to_tests":[]}')])])
+
+    data = runner.run(BY_ID["ST-03"], "design it", DESIGN_SCHEMA)
+    assert data["approach"] == "a"
+
+    sent = runner._client.messages.calls[0]
+    assert sent["model"] == "claude-opus-5"                 # from the roster
+    assert sent["output_config"]["effort"] == "high"
+    assert sent["thinking"] == {"type": "adaptive"}
+    assert sent["output_config"]["format"]["schema"] is DESIGN_SCHEMA
+
+
+def test_claude_runner_uses_the_cheap_model_where_the_work_is_retrieval():
+    from fastpdlc.orchestration import BY_ID
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner(api_key="test")
+    runner._client = _FakeClient([_Resp([_Block("a brief")])])
+    runner.run(BY_ID["ST-01"], "read the graph")
+
+    sent = runner._client.messages.calls[0]
+    assert sent["model"] == "claude-haiku-4-5"
+    assert sent["output_config"]["effort"] == "low"
+
+
+def test_claude_runner_surfaces_a_refusal_rather_than_returning_junk():
+    from fastpdlc.orchestration import BY_ID
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner(api_key="test")
+    runner._client = _FakeClient([_Resp([], stop_reason="refusal")])
+    with pytest.raises(RuntimeError, match="refused"):
+        runner.run(BY_ID["ST-03"], "x")
+
+
+def test_claude_runner_rejects_unparseable_json():
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner(api_key="test")
+    runner._client = _FakeClient([_Resp([_Block("not json at all")])])
+    with pytest.raises(RuntimeError, match="unparseable"):
+        runner.run(BY_ID["ST-03"], "x", DESIGN_SCHEMA)
+
+
+def test_coding_runner_executes_tools_and_reports_what_it_actually_wrote(tmp_path):
+    """The sandbox is the source of truth about files changed, not the model's
+    recollection of what it changed."""
+    from fastpdlc.coding import CodingRunner
+    from fastpdlc.orchestration import BY_ID, DEVELOP_SCHEMA
+
+    (tmp_path / "existing.py").write_text("old\n", encoding="utf-8")
+
+    runner = CodingRunner(root=tmp_path, write=True, api_key="test")
+    runner._client = _FakeClient([
+        _Resp([_ToolBlock("list_files", {"path": "."})], stop_reason="tool_use"),
+        _Resp([_ToolBlock("write_file", {"path": "new.py", "content": "print(1)\n"})],
+              stop_reason="tool_use"),
+        _Resp([_Block("done")]),
+        # the final structured call: it under-reports on purpose
+        _Resp([_Block('{"files_changed":[],"diff_summary":"added new.py"}')]),
+    ])
+
+    data = runner.run(BY_ID["ST-04"], "implement it", DEVELOP_SCHEMA)
+
+    assert (tmp_path / "new.py").read_text(encoding="utf-8") == "print(1)\n"
+    assert data["files_changed"] == ["new.py"]        # sandbox wins over the model
+    assert data["diff_summary"] == "added new.py"
+
+
+def test_coding_runner_refuses_to_escape_the_root(tmp_path):
+    from fastpdlc.coding import CodingRunner
+    from fastpdlc.orchestration import BY_ID, DEVELOP_SCHEMA
+
+    root = tmp_path / "project"; root.mkdir()
+    (tmp_path / "outside.txt").write_text("secret\n", encoding="utf-8")
+
+    runner = CodingRunner(root=root, write=True, api_key="test")
+    runner._client = _FakeClient([
+        _Resp([_ToolBlock("read_file", {"path": "../outside.txt"})], stop_reason="tool_use"),
+        _Resp([_Block("blocked")]),
+        _Resp([_Block('{"files_changed":[],"diff_summary":"nothing"}')]),
+    ])
+    runner.run(BY_ID["ST-04"], "read the secret", DEVELOP_SCHEMA)
+
+    # the refusal is fed back to the model as a tool result, not raised
+    tool_results = [
+        block
+        for call in runner._client.messages.calls
+        for message in call["messages"]
+        if isinstance(message.get("content"), list)
+        for block in message["content"]
+        if isinstance(block, dict) and block.get("type") == "tool_result"
+    ]
+    assert tool_results, "the tool result was never sent back to the model"
+    joined = " ".join(str(b["content"]) for b in tool_results)
+    assert "REFUSED" in joined
+    assert "secret" not in joined          # the file contents never leaked
+
+
+def test_coding_runner_stops_at_the_turn_limit_and_says_so(tmp_path):
+    """A loop that will not converge must report honestly, not spin."""
+    from fastpdlc.coding import CodingRunner
+    from fastpdlc.orchestration import BY_ID, DEVELOP_SCHEMA
+
+    runner = CodingRunner(root=tmp_path, write=True, api_key="test", max_turns=3)
+    runner._client = _FakeClient(
+        [_Resp([_ToolBlock("list_files", {"path": "."})], stop_reason="tool_use")] * 3)
+
+    data = runner.run(BY_ID["ST-04"], "spin forever", DEVELOP_SCHEMA)
+    assert "without converging" in data["diff_summary"]
+    assert data["self_notes"] == "turn limit reached"
+
+
+def test_coding_runner_delegates_other_stations(tmp_path):
+    """Only Develop needs tools; everything else is one structured call."""
+    from fastpdlc.coding import CodingRunner
+    from fastpdlc.orchestration import BY_ID
+
+    class Recorder:
+        def __init__(self): self.seen = []
+        def run(self, station, prompt, schema=None):
+            self.seen.append(station.id); return {"ok": True}
+
+    rec = Recorder()
+    runner = CodingRunner(root=tmp_path, api_key="test", fallback=rec)
+    runner.run(BY_ID["ST-03"], "design")
+    runner.run(BY_ID["ST-06"], "verify")
+    assert rec.seen == ["ST-03", "ST-06"]
