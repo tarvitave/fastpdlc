@@ -77,13 +77,18 @@ def lens_cards() -> str:
 def main() -> int:
     html = HOME.read_text(encoding="utf-8")
 
-    # ── 1. hero rail: PAC chips -> station roster ────────────────────────────
-    old_rail = _between(html, '<div class="rail" aria-hidden="true">', "</div>\n  </div>")
-    new_rail = ('<div class="rail" aria-hidden="true">\n    '
-                '<div class="rail-track" id="railTrack">\n      '
-                + rail_cards()
-                + "\n    </div>\n  </div>")
-    html = html.replace(old_rail, new_rail, 1)
+    # ── 1. hero rail: replace the whole region, idempotently ────────────────
+    # Do NOT slice on a closing-tag pattern. Once the rail holds station cards,
+    # their own markup ends the same way, so a second run cuts in the wrong place,
+    # leaves orphaned <article> tags, and the cards spill down the page. Anchoring
+    # on the next landmark makes the rewrite safe to repeat.
+    start = html.index('<div class="rail" aria-hidden="true">')
+    end = html.index('<div class="wrap hero-grid">')
+    html = html[:start] + (
+        '<div class="rail" aria-hidden="true">\n    '
+        '<div class="rail-track" id="railTrack">\n      '
+        + rail_cards()
+        + "\n    </div>\n  </div>\n\n  ") + html[end:]
 
     # ── 2. hero copy ────────────────────────────────────────────────────────
     html = html.replace(
@@ -111,8 +116,9 @@ def main() -> int:
         html = html.replace(anchor, (LENS_SECTION % lens_cards()) + "\n" + anchor, 1)
 
     # ── 4. nav ──────────────────────────────────────────────────────────────
-    html = html.replace('      <a href="/lifecycle.html">Lifecycle</a>\n',
-                        '      <a href="/lifecycle.html">Lifecycle</a>\n      <a href="#lenses">Lenses</a>\n', 1)
+    if '<a href="#lenses">Lenses</a>' not in html:
+        html = html.replace('      <a href="/lifecycle.html">Lifecycle</a>\n',
+                            '      <a href="/lifecycle.html">Lifecycle</a>\n      <a href="#lenses">Lenses</a>\n', 1)
 
     HOME.write_text(html, encoding="utf-8", newline="\n")
     print(f"rebuilt {HOME.name}")
