@@ -17,7 +17,10 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import (HTMLResponse, JSONResponse, RedirectResponse,
+                               StreamingResponse)
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
 
 import newsletter as nl
@@ -82,6 +85,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="fastpdlc.com", docs_url=None, redoc_url=None, lifespan=lifespan)
 app.include_router(admin_router)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _unauthenticated_browsers_get_the_login_page(request: Request, exc):
+    """A browser asking for /admin should be shown the sign-in form, not a JSON 401.
+
+    The auth dependency raises 401 because that is the correct status; the mistake
+    was letting FastAPI render it as `{"detail": "not signed in"}` for someone who
+    typed a URL. API clients still get the JSON — the distinction is the Accept
+    header, not the path.
+    """
+    if (exc.status_code == 401
+            and request.url.path.startswith("/admin")
+            and "text/html" in request.headers.get("accept", "")):
+        return RedirectResponse("/admin/login", status_code=303)
+    return await http_exception_handler(request, exc)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

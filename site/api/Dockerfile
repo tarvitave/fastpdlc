@@ -18,4 +18,7 @@ RUN useradd --uid 10001 --create-home appuser  && mkdir -p /data  && chown appus
 USER appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# --proxy-headers so uvicorn honours X-Forwarded-Proto from Caddy. Without it
+# every framework-generated redirect is http://, which costs an extra hop and
+# briefly sends the URL in plaintext before Caddy upgrades it.
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
