@@ -235,7 +235,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: tarvitave/fastpdlc@v0.1.0
+      - uses: tarvitave/fastpdlc@v0.4.0
         with:
           config: product.config.yaml     # optional (default)
           plugin: product_hooks.py         # optional project checks
@@ -254,7 +254,7 @@ jobs:
 ## Used in production
 
 FastPDLC is the product-as-code engine of the **pharthing / KibiPay** payments
-platform (39 features, a concept catalogue, and a ~283 KB render bundle). pharthing's
+platform (50 features, a concept catalogue, 70 decisions, and a ~490 KB render bundle). pharthing's
 CI runs `fastpdlc validate` as its sole gate via a plugin that adds domain checks — a
 byte-identical parity test proves nothing was lost in the extraction. That's the
 plugin system above, doing real work.
