@@ -314,6 +314,34 @@ def test_disambiguate_blocks_before_design():
     assert "ST-03" not in stations
 
 
+def test_advisory_gate_records_questions_but_does_not_block():
+    """block_on_unresolved=False is the autonomous run: open questions are still
+    recorded on the report, but the line proceeds to build rather than stopping —
+    the PR's gates and the human merge become the judge."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    questions = [{"id": "q1", "dimension": "refund window start",
+                  "question": "From authorization, settlement or delivery?"}]
+    report = Orchestrator(StubRunner(questions=questions)).run(
+        "FEAT-refunds", block_on_unresolved=False)
+
+    assert report.status == "proposed"                 # it built, did not block
+    assert report.disambiguation == questions          # but the questions ride along
+    stations = [s.station for s in report.steps]
+    assert "ST-03" in stations and "ST-04" in stations  # Design + Develop ran
+    assert any("advisory gate" in n for n in report.notes)
+
+
+def test_blocking_gate_is_the_default():
+    """The safe default is unchanged: without opting in, an open question blocks."""
+    from fastpdlc.orchestration import Orchestrator, StubRunner
+
+    questions = [{"id": "q1", "dimension": "d", "question": "?"}]
+    report = Orchestrator(StubRunner(questions=questions)).run("FEAT-refunds")
+    assert report.status == "blocked"                  # default still blocks
+    assert "ST-03" not in [s.station for s in report.steps]
+
+
 def test_resolved_questions_let_the_line_continue():
     from fastpdlc.orchestration import Orchestrator, StubRunner
 

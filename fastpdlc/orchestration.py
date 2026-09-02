@@ -566,7 +566,18 @@ class Orchestrator:
         )
 
     # ── the line ─────────────────────────────────────────────────────────
-    def run(self, feature: str) -> RunReport:
+    def run(self, feature: str, *, block_on_unresolved: bool = True) -> RunReport:
+        """Run the line for one feature.
+
+        ``block_on_unresolved`` (default True) is the human gate: any question the
+        Disambiguate station cannot answer from the brief stops the run before Design,
+        because building the wrong thing correctly is the expensive failure. Set it
+        False for an AUTONOMOUS run — the questions are still recorded on the report,
+        but the line proceeds to build on the versioned product intent, deferring the
+        human judgement to the concrete PR (its gates and the merge) rather than a set
+        of abstract pre-build questions. The open questions ride along on the report
+        so the caller can surface them for the record.
+        """
         report = RunReport(feature=feature)
 
         brief = self.understand(feature)
@@ -578,13 +589,18 @@ class Orchestrator:
         gate, unresolved = self.disambiguate(feature, brief.data)
         report.steps.append(gate)
         if unresolved:
-            # Building the wrong thing correctly is the expensive failure.
+            # Recorded either way; only a blocking gate stops here.
             report.disambiguation = unresolved
-            report.status = "blocked"
+            if block_on_unresolved:
+                report.status = "blocked"
+                report.notes.append(
+                    f"{len(unresolved)} question(s) need a human answer before design; "
+                    "re-run with resolutions to continue.")
+                return report
             report.notes.append(
-                f"{len(unresolved)} question(s) need a human answer before design; "
-                "re-run with resolutions to continue.")
-            return report
+                f"{len(unresolved)} open question(s) recorded but NOT blocking "
+                "(advisory gate): proceeding to build on the versioned intent — the "
+                "PR's gates and the human merge are the judge.")
 
         design = self.design(feature, brief.data)
         report.steps.append(design)
