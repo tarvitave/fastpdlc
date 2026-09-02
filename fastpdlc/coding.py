@@ -146,15 +146,22 @@ class CodingRunner:
 
     def __init__(self, root: str | pathlib.Path = ".", *, write: bool = False,
                  api_key: str | None = None, max_turns: int = MAX_TURNS,
-                 fallback: Any = None, model: str = "claude-opus-5"):
+                 fallback: Any = None, model: str = "claude-opus-5",
+                 thinking: Any = None):
         self.sandbox = Sandbox(root, write=write)
         self.max_turns = max_turns
         self.model = model
         self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self._client: Any = None
-        # Non-Develop stations do not need tools; delegate them.
-        from .runners import ClaudeRunner
-        self.fallback = fallback or ClaudeRunner(api_key=self._api_key)
+        # Same thinking resolution + graceful-degrade path as ClaudeRunner, so a
+        # non-thinking model here won't sink the tool loop either. `_UNSET` means
+        # "resolve from FASTPDLC_THINKING"; an explicit value (incl. None) wins.
+        from .runners import ClaudeRunner, resolve_thinking, _UNSET
+        self._thinking = resolve_thinking(_UNSET if thinking is None else thinking)
+        self._thinking_supported = True
+        # Non-Develop stations do not need tools; delegate them (same thinking arg).
+        self.fallback = fallback or ClaudeRunner(
+            api_key=self._api_key, thinking=(_UNSET if thinking is None else thinking))
 
     def _get_client(self) -> Any:
         if self._client is not None:
@@ -192,16 +199,20 @@ class CodingRunner:
         client = self._get_client()
         messages: list[dict] = [{"role": "user", "content": prompt}]
 
+        from .runners import create_message
         for _turn in range(self.max_turns):
-            response = client.messages.create(
+            base_kwargs = dict(
                 model=self.model,
                 max_tokens=16000,
                 system=SYSTEM,
-                thinking={"type": "adaptive"},
                 output_config={"effort": station.effort or "high"},
                 tools=TOOLS,
                 messages=messages,
             )
+            thinking = self._thinking if self._thinking_supported else None
+            response, accepted = create_message(client, base_kwargs, thinking)
+            if thinking is not None and not accepted:
+                self._thinking_supported = False
             if getattr(response, "stop_reason", None) == "refusal":
                 raise RuntimeError(f"{station.id} refused by safety classifier")
 

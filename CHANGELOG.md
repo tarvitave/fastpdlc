@@ -12,6 +12,28 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.4.1] — 2026-09-02
+
+### Fixed
+
+- **Thinking is no longer hard-wired on — the pipeline survives a model that doesn't
+  support it.** Both runners sent `thinking={"type": "adaptive"}` on *every* station,
+  but the roster runs `Understand` (ST-01) on `claude-haiku-4-5`, which rejects that
+  param with `400 - adaptive thinking is not supported on this model`. A live run
+  therefore died at the very first station. Now, when a model rejects the thinking
+  param specifically, the call retries once without it and the runner stops sending it
+  for the rest of the process; any other 4xx still propagates unchanged. A run on a
+  provisioned key works out of the box again, with no configuration.
+
+### Added
+
+- **`FASTPDLC_THINKING` env var and a `thinking=` runner argument** to control extended
+  thinking explicitly. Precedence: an explicit `thinking=` passed to `ClaudeRunner` /
+  `CodingRunner` (including `None`) wins; otherwise `FASTPDLC_THINKING`; otherwise
+  adaptive. Env values: `adaptive` (default), `off`/`none`/`0`/empty to omit, or
+  `enabled:<budget_tokens>` for fixed-budget extended thinking. `runners.resolve_thinking`
+  and `runners.create_message` (the graceful-degrade `messages.create` wrapper) are public.
+
 ## [0.4.0] — 2026-08-24
 
 ### Added
