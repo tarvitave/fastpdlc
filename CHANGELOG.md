@@ -12,6 +12,18 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.6.2] — 2026-09-02
+
+### Fixed
+
+- **Portable structured output across gateway-routed providers.** `OpenAIRunner` no longer sends the
+  OpenAI `response_format=json_object` param by default — a gateway that routes to Anthropic returns a
+  **400** on it (surfacing as `all_candidates_failed … upstream 400`). Instead it asks for a JSON
+  object in the prompt and parses the reply with `extract_json_object`, which tolerates a ```json
+  fence or a little surrounding prose. Opt back into strict `response_format` with `json_mode=True`
+  when the endpoint supports it (e.g. OpenAI proper). The coding runner's final structured call does
+  the same. `runners.extract_json_object` is public.
+
 ## [0.6.1] — 2026-09-02
 
 ### Fixed

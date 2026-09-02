@@ -331,15 +331,21 @@ class OpenAICodingRunner(CodingRunner):
                 "self_notes": "turn limit reached",
             }
 
-        # Converged — one more call, no tools, for the structured result.
+        # Converged — one more call, no tools, for the structured result. Ask for JSON in
+        # the prompt (not response_format) so this works on gateway-routed providers that
+        # reject the json_object param, and parse tolerantly.
+        from .runners import extract_json_object
         messages.append({"role": "user",
-                         "content": "Return the final structured result for this change now, as JSON."})
-        body = {"model": self.model, "max_tokens": 4096, "temperature": 0,
-                "response_format": {"type": "json_object"}, "messages": messages}
+                         "content": "Return the final structured result for this change now as ONE "
+                                    "JSON object (files_changed, diff_summary, self_notes) — no prose, "
+                                    "no markdown fences."})
+        body = {"model": self.model, "max_tokens": 4096, "temperature": 0, "messages": messages}
         payload, _ = openai_chat(self.base_url, self._api_key, body, self._timeout, self._extra_headers)
         text = payload["choices"][0]["message"].get("content") or ""
         try:
-            data = json.loads(text)
+            data = extract_json_object(text)
+            if not isinstance(data, dict):
+                data = {"files_changed": [], "diff_summary": str(data)[:800]}
         except ValueError:
             data = {"files_changed": [], "diff_summary": text[:800]}
         data["files_changed"] = sorted(set(self.sandbox.written))
