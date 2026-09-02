@@ -1333,3 +1333,78 @@ def test_claude_runner_survives_a_haiku_station_end_to_end():
     calls = runner._client.messages.calls
     assert "thinking" not in calls[-1]                # last (successful) call sent neither
     assert "effort" not in (calls[-1].get("output_config") or {})
+
+
+# ── OpenAI-compatible runners: the config bridge to a gateway (Muchty/OpenRouter/…) ──
+# These let the pipeline be pointed at any /chat/completions endpoint by base_url.
+# We patch runners.openai_chat (coding imports it from there at call time) with a
+# scripted fake, so no network and no SDK.
+
+def _oai_msg(content=None, tool_calls=None):
+    m = {"role": "assistant", "content": content}
+    if tool_calls is not None:
+        m["tool_calls"] = tool_calls
+    return {"choices": [{"message": m}]}, "served-model-x"
+
+
+def test_openai_runner_parses_structured_json(monkeypatch):
+    from fastpdlc import runners
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
+    seen = {}
+    def fake(base_url, api_key, body, timeout=120.0, extra_headers=None):
+        seen.update(base_url=base_url, headers=extra_headers, body=body)
+        return _oai_msg('{"approach":"a","files":[],"criteria_to_tests":[]}')
+    monkeypatch.setattr(runners, "openai_chat", fake)
+    r = runners.OpenAIRunner("https://gw.example/v1", api_key="k",
+                             extra_headers={"X-Muchty-Concept": "code.repair"})
+    data = r.run(BY_ID["ST-03"], "design it", DESIGN_SCHEMA)
+    assert data["approach"] == "a"
+    assert seen["base_url"] == "https://gw.example/v1"
+    assert seen["headers"]["X-Muchty-Concept"] == "code.repair"   # routing rides on headers
+    assert seen["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_openai_runner_text_when_no_schema(monkeypatch):
+    from fastpdlc import runners
+    from fastpdlc.orchestration import BY_ID
+    monkeypatch.setattr(runners, "openai_chat", lambda *a, **k: _oai_msg("hello"))
+    r = runners.OpenAIRunner("https://gw/v1", api_key="k")
+    assert r.run(BY_ID["ST-01"], "understand") == {"text": "hello"}
+
+
+def test_openai_coding_runner_writes_files_via_tool_loop(monkeypatch, tmp_path):
+    # Develop routed through an OpenAI endpoint: a tool_call writes a file, the loop
+    # ends, and files_changed reflects the sandbox — not the model's say-so.
+    from fastpdlc import runners
+    from fastpdlc.coding import OpenAICodingRunner
+    from fastpdlc.orchestration import BY_ID
+
+    calls = {"n": 0}
+    def fake(base_url, api_key, body, timeout=120.0, extra_headers=None):
+        calls["n"] += 1
+        if calls["n"] == 1:      # first turn → call write_file
+            return _oai_msg(None, tool_calls=[{
+                "id": "c1", "type": "function",
+                "function": {"name": "write_file",
+                             "arguments": '{"path": "hello.txt", "content": "hi"}'}}])
+        if calls["n"] == 2:      # second turn → no tool calls → converge
+            return _oai_msg("done")
+        return _oai_msg('{"diff_summary": "wrote hello.txt", "self_notes": ""}')  # final structured
+    monkeypatch.setattr(runners, "openai_chat", fake)
+
+    runner = OpenAICodingRunner(root=tmp_path, write=True, base_url="https://gw/v1", api_key="k")
+    out = runner.run(BY_ID["ST-04"], "make hello.txt")
+    assert (tmp_path / "hello.txt").read_text() == "hi"      # the tool actually wrote it
+    assert out["files_changed"] == ["hello.txt"]             # sandbox is source of truth
+    assert calls["n"] == 3
+
+
+def test_openai_coding_runner_delegates_non_develop(monkeypatch, tmp_path):
+    # Non-Develop stations go to the OpenAIRunner fallback (one structured call).
+    from fastpdlc import runners
+    from fastpdlc.coding import OpenAICodingRunner
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
+    monkeypatch.setattr(runners, "openai_chat",
+                        lambda *a, **k: _oai_msg('{"approach":"b","files":[],"criteria_to_tests":[]}'))
+    runner = OpenAICodingRunner(root=tmp_path, base_url="https://gw/v1", api_key="k")
+    assert runner.run(BY_ID["ST-03"], "design", DESIGN_SCHEMA)["approach"] == "b"

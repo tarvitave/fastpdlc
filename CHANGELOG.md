@@ -12,6 +12,24 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.6.0] — 2026-09-02
+
+### Added
+
+- **OpenAI-compatible runners — the `base_url` config bridge.** `runners.OpenAIRunner` and
+  `coding.OpenAICodingRunner` run the pipeline against *any* OpenAI `/chat/completions`
+  endpoint — a routing gateway (e.g. Muchty), OpenRouter, a local vLLM/Ollama, or OpenAI
+  itself — selected purely by `base_url`. Same `run(station, prompt, schema)` contract as
+  the native Anthropic runners, so they drop into the `Orchestrator` unchanged; the Develop
+  tool loop uses OpenAI function-calling instead of Anthropic tool-use blocks. Gateway
+  routing/metadata (a concept header, a project tag) rides on `extra_headers`; the served
+  model is read back from `x-muchty-model`/`x-model` when present. stdlib-only — no SDK
+  dependency (matching `CrossProviderLens`). `runners.openai_chat` is public.
+
+  This is what makes routing a build through a model gateway a configuration choice rather
+  than a fork: point `base_url` at the gateway and the whole reasoning + code-writing line
+  runs through it, with per-provider cost/routing and BYOK billing for the build phase.
+
 ## [0.5.0] — 2026-09-02
 
 ### Added

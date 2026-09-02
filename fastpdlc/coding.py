@@ -263,3 +263,87 @@ class CodingRunner:
         if not self.sandbox.write_enabled:
             data["self_notes"] += " (dry run: no files were written)"
         return data
+
+
+# The same three tools, in the OpenAI function-calling shape (Anthropic uses input_schema;
+# OpenAI nests name/description/parameters under `function`).
+OPENAI_TOOLS = [
+    {"type": "function", "function": {
+        "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
+    for t in TOOLS
+]
+
+
+class OpenAICodingRunner(CodingRunner):
+    """A CodingRunner against any OpenAI-compatible endpoint (a gateway like Muchty,
+    OpenRouter, a local server, or OpenAI). Same Sandbox, same tools, same
+    source-of-truth accounting as CodingRunner — but the Develop tool loop uses OpenAI
+    function-calling instead of Anthropic tool-use blocks, so a build can be routed
+    through a gateway purely by ``base_url``. Non-Develop stations delegate to an
+    OpenAIRunner over the same endpoint.
+    """
+
+    def __init__(self, root: str | pathlib.Path = ".", *, write: bool = False,
+                 base_url: str, api_key: str | None = None, model: str = "auto",
+                 max_turns: int = MAX_TURNS, fallback: Any = None,
+                 extra_headers: dict | None = None, timeout: float = 120.0):
+        self.sandbox = Sandbox(root, write=write)
+        self.max_turns = max_turns
+        self.model = model
+        self.base_url = base_url
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self._extra_headers = dict(extra_headers or {})
+        self._timeout = timeout
+        from .runners import OpenAIRunner
+        self.fallback = fallback or OpenAIRunner(
+            base_url=base_url, api_key=self._api_key, model=model,
+            extra_headers=self._extra_headers, timeout=timeout)
+
+    def run(self, station: Station, prompt: str, schema: dict | None = None) -> dict:
+        if station.id not in ("ST-04", "ST-04b"):
+            return self.fallback.run(station, prompt, schema)
+
+        from .runners import openai_chat
+        messages: list[dict] = [{"role": "system", "content": SYSTEM},
+                                {"role": "user", "content": prompt}]
+        for _turn in range(self.max_turns):
+            body = {"model": self.model, "max_tokens": 16000, "temperature": 0,
+                    "tools": OPENAI_TOOLS, "tool_choice": "auto", "messages": messages}
+            payload, _ = openai_chat(self.base_url, self._api_key, body, self._timeout, self._extra_headers)
+            msg = payload["choices"][0]["message"]
+            tool_calls = msg.get("tool_calls") or []
+            if not tool_calls:
+                break
+            messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": tool_calls})
+            for tc in tool_calls:
+                fn = tc.get("function") or {}
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except ValueError:
+                    args = {}
+                messages.append({"role": "tool", "tool_call_id": tc.get("id"),
+                                 "content": self._dispatch(fn.get("name", ""), args)})
+        else:
+            return {
+                "files_changed": sorted(set(self.sandbox.written)),
+                "diff_summary": (f"stopped after {self.max_turns} turns without "
+                                 f"converging; treat this change as incomplete"),
+                "self_notes": "turn limit reached",
+            }
+
+        # Converged — one more call, no tools, for the structured result.
+        messages.append({"role": "user",
+                         "content": "Return the final structured result for this change now, as JSON."})
+        body = {"model": self.model, "max_tokens": 8000, "temperature": 0,
+                "response_format": {"type": "json_object"}, "messages": messages}
+        payload, _ = openai_chat(self.base_url, self._api_key, body, self._timeout, self._extra_headers)
+        text = payload["choices"][0]["message"].get("content") or ""
+        try:
+            data = json.loads(text)
+        except ValueError:
+            data = {"files_changed": [], "diff_summary": text[:800]}
+        data["files_changed"] = sorted(set(self.sandbox.written))
+        data.setdefault("self_notes", "")
+        if not self.sandbox.write_enabled:
+            data["self_notes"] += " (dry run: no files were written)"
+        return data
