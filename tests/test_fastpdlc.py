@@ -1458,3 +1458,19 @@ def test_openai_chat_surfaces_http_error_body(monkeypatch):
     import pytest as _pytest
     with _pytest.raises(RuntimeError, match="upstream anthropic key invalid"):
         runners.openai_chat("https://gw/v1", "k", {"messages": []})
+
+
+def test_openai_runner_omits_temperature_by_default(monkeypatch):
+    # Claude-5-family models reject `temperature` as deprecated (400); it must be OFF
+    # unless explicitly requested.
+    from fastpdlc import runners
+    from fastpdlc.orchestration import BY_ID
+    seen = {}
+    def fake(base_url, api_key, body, timeout=120.0, extra_headers=None):
+        seen["body"] = body
+        return _oai_msg("hi")
+    monkeypatch.setattr(runners, "openai_chat", fake)
+    runners.OpenAIRunner("https://gw/v1", api_key="k").run(BY_ID["ST-01"], "x")
+    assert "temperature" not in seen["body"]
+    runners.OpenAIRunner("https://gw/v1", api_key="k", temperature=0).run(BY_ID["ST-01"], "x")
+    assert seen["body"]["temperature"] == 0                       # opt-in still works

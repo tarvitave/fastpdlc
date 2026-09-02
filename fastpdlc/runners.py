@@ -313,14 +313,16 @@ class OpenAIRunner:
 
     def __init__(self, base_url: str, api_key: str | None = None, *, model: str = "auto",
                  system: str = SYSTEM, max_tokens: int = 8192, json_mode: bool = False,
+                 temperature: float | None = None,
                  extra_headers: dict | None = None, timeout: float = 120.0):
         self.base_url = base_url
         self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self.model = model
         self._system = system
         self._max_tokens = max_tokens
-        self._extra_headers = dict(extra_headers or {})
         self._json_mode = json_mode
+        self._temperature = temperature
+        self._extra_headers = dict(extra_headers or {})
         self.timeout = timeout
 
     def run(self, station: Station, prompt: str, schema: dict | None = None) -> dict:
@@ -333,12 +335,16 @@ class OpenAIRunner:
         body: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self._max_tokens,
-            "temperature": 0,
             "messages": [
                 {"role": "system", "content": self._system},
                 {"role": "user", "content": user},
             ],
         }
+        # `temperature` is OFF by default: newer models (the Claude 5 family) reject it as
+        # a deprecated param with a 400, and it isn't needed for structured stations. Pass
+        # temperature=<n> explicitly for an endpoint/model that still wants it.
+        if self._temperature is not None:
+            body["temperature"] = self._temperature
         if schema is not None and self._json_mode:
             body["response_format"] = {"type": "json_object"}
         payload, _served = openai_chat(self.base_url, self._api_key, body, self.timeout,
