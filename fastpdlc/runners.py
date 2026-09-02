@@ -28,6 +28,52 @@ Product intent is versioned source and the rubric already exists. You are labour
 against it, not an author of it."""
 
 
+_UNSET: Any = object()
+
+
+def resolve_thinking(explicit: Any = _UNSET) -> dict | None:
+    """The Anthropic ``thinking`` config to send, or ``None`` to omit the param.
+
+    Not every model supports extended thinking — Haiku, in particular, rejects
+    ``{"type": "adaptive"}`` with a 400 — so this must be controllable rather than
+    hard-wired on. Precedence: an explicit value passed to the runner (including an
+    explicit ``None``) wins; otherwise the ``FASTPDLC_THINKING`` env var; otherwise
+    adaptive. Accepted env values: ``adaptive`` (default), ``off``/``none``/``0``/``""``
+    to omit, or ``enabled:<budget_tokens>`` for fixed-budget extended thinking.
+    """
+    if explicit is not _UNSET:
+        return explicit
+    raw = os.getenv("FASTPDLC_THINKING", "adaptive").strip().lower()
+    if raw in ("", "off", "none", "no", "0", "false"):
+        return None
+    if raw.startswith("enabled"):
+        _, _, budget = raw.partition(":")
+        try:
+            return {"type": "enabled", "budget_tokens": int(budget)}
+        except ValueError:
+            return {"type": "enabled", "budget_tokens": 8000}
+    return {"type": "adaptive"}
+
+
+def create_message(client: Any, base_kwargs: dict, thinking: dict | None) -> tuple[Any, bool]:
+    """``messages.create`` that degrades gracefully when a model rejects ``thinking``.
+
+    A station running a model without extended-thinking support (e.g. the Haiku
+    ``Understand`` station) would otherwise 400 and sink the whole run at step one.
+    When ``thinking`` is set and the API rejects *specifically* the thinking param,
+    retry the same call once without it. Returns ``(response, thinking_was_accepted)``
+    so the caller can stop sending it on later calls in the same process.
+    """
+    if thinking is not None:
+        try:
+            return client.messages.create(thinking=thinking, **base_kwargs), True
+        except Exception as exc:
+            if "thinking" not in str(exc).lower():
+                raise
+            # Model doesn't support this thinking mode — fall through and omit it.
+    return client.messages.create(**base_kwargs), False
+
+
 class ClaudeRunner:
     """Runs a station as one structured Messages API call.
 
@@ -38,10 +84,12 @@ class ClaudeRunner:
     """
 
     def __init__(self, api_key: str | None = None, *, max_tokens: int = 16000,
-                 system: str = SYSTEM):
+                 system: str = SYSTEM, thinking: Any = _UNSET):
         self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self._max_tokens = max_tokens
         self._system = system
+        self._thinking = resolve_thinking(thinking)
+        self._thinking_supported = True   # flipped off once a model 400s on it
         self._client: Any = None
 
     def _get_client(self) -> Any:
@@ -66,14 +114,17 @@ class ClaudeRunner:
         if schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": schema}
 
-        response = client.messages.create(
-            model=station.model or "claude-opus-5",
-            max_tokens=self._max_tokens,
-            system=self._system,
-            thinking={"type": "adaptive"},
-            output_config=output_config,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        base_kwargs = {
+            "model": station.model or "claude-opus-5",
+            "max_tokens": self._max_tokens,
+            "system": self._system,
+            "output_config": output_config,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        thinking = self._thinking if self._thinking_supported else None
+        response, accepted = create_message(client, base_kwargs, thinking)
+        if thinking is not None and not accepted:
+            self._thinking_supported = False  # this model rejects it; skip it hereafter
 
         if getattr(response, "stop_reason", None) == "refusal":
             raise RuntimeError(f"{station.id} refused by safety classifier")

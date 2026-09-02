@@ -1200,3 +1200,83 @@ def test_the_cleaner_needs_tools_like_develop(tmp_path):
     runner.run(BY_ID["ST-03"], "design")          # delegated
     assert rec.seen == ["ST-03"]
     assert "ST-04b" not in rec.seen               # Clean is NOT delegated
+
+
+# ── thinking config: resolution + graceful degrade on models without it ──────
+# A station on a model that doesn't support extended thinking (e.g. the Haiku
+# `Understand` station, ST-01) used to 400 on a hard-wired thinking={"type":
+# "adaptive"} and sink the whole run at step one. These pin the fix. (Uses
+# uniquely-named fakes so as not to clobber the scripted _FakeClient above.)
+
+class _ThinkMessages:
+    """A messages stub that 400s specifically when a `thinking` param is sent."""
+    def __init__(self, resp, reject_thinking=True, other_error=None):
+        self.resp, self._reject, self._other = resp, reject_thinking, other_error
+        self.calls = []
+
+    def create(self, **kw):
+        self.calls.append(kw)
+        if self._other is not None and self._other in kw.get("model", ""):
+            raise Exception("400 - invalid model")
+        if self._reject and "thinking" in kw:
+            raise Exception("Error code: 400 - adaptive thinking is not supported on this model")
+        return self.resp
+
+
+class _ThinkClient:
+    def __init__(self, messages):
+        self.messages = messages
+
+
+def test_resolve_thinking_precedence(monkeypatch):
+    from fastpdlc.runners import resolve_thinking
+    monkeypatch.delenv("FASTPDLC_THINKING", raising=False)
+    assert resolve_thinking() == {"type": "adaptive"}                 # default on
+    assert resolve_thinking(None) is None                              # explicit wins over env
+    monkeypatch.setenv("FASTPDLC_THINKING", "off")
+    assert resolve_thinking() is None
+    monkeypatch.setenv("FASTPDLC_THINKING", "enabled:5000")
+    assert resolve_thinking() == {"type": "enabled", "budget_tokens": 5000}
+    assert resolve_thinking({"type": "adaptive"}) == {"type": "adaptive"}  # explicit still wins
+
+
+def test_create_message_degrades_when_model_rejects_thinking():
+    from fastpdlc.runners import create_message
+    msgs = _ThinkMessages("OK", reject_thinking=True)
+    resp, accepted = create_message(_ThinkClient(msgs),
+                                    {"model": "claude-haiku-4-5", "messages": []},
+                                    {"type": "adaptive"})
+    assert resp == "OK" and accepted is False        # retried without thinking, succeeded
+    assert len(msgs.calls) == 2                       # once with, once without
+    assert "thinking" not in msgs.calls[1]
+
+
+def test_create_message_propagates_non_thinking_errors():
+    from fastpdlc.runners import create_message
+    msgs = _ThinkMessages("OK", reject_thinking=False, other_error="boom")
+    with pytest.raises(Exception, match="invalid model"):
+        create_message(_ThinkClient(msgs), {"model": "boom", "messages": []}, {"type": "adaptive"})
+
+
+def test_create_message_omits_param_when_thinking_none():
+    from fastpdlc.runners import create_message
+    msgs = _ThinkMessages("OK", reject_thinking=True)   # would raise IF thinking were sent
+    resp, accepted = create_message(_ThinkClient(msgs), {"model": "x", "messages": []}, None)
+    assert resp == "OK" and accepted is False and len(msgs.calls) == 1
+    assert "thinking" not in msgs.calls[0]
+
+
+def test_claude_runner_stops_sending_thinking_after_a_rejection():
+    # End-to-end: the first call downgrades, and the per-runner flag makes the
+    # second call never even attempt thinking again.
+    from fastpdlc.orchestration import BY_ID
+    from fastpdlc.runners import ClaudeRunner
+
+    runner = ClaudeRunner(api_key="test")
+    runner._client = _ThinkClient(_ThinkMessages(_Resp([_Block("hi")]), reject_thinking=True))
+    runner.run(BY_ID["ST-01"], "understand")        # haiku station -> rejects thinking
+    runner.run(BY_ID["ST-01"], "understand again")
+    calls = runner._client.messages.calls
+    assert len(calls) == 3                          # try+retry, then one clean call
+    assert "thinking" in calls[0]
+    assert "thinking" not in calls[1] and "thinking" not in calls[2]
