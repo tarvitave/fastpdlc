@@ -277,6 +277,30 @@ def openai_chat(base_url: str, api_key: str, body: dict, timeout: float = 120.0,
         raise RuntimeError(f"gateway {exc.code} from {url}: {detail}") from exc
 
 
+_JSON_ONLY = ("\n\nIMPORTANT: reply with ONE JSON object matching the requested schema and "
+              "nothing else — no prose, no explanation, no markdown code fences.")
+
+
+def extract_json_object(text: str) -> Any:
+    """Parse a JSON object out of a model's text reply, tolerating a ```json fence or a
+    little surrounding prose — so this works across gateway-routed models that don't honour
+    a strict json_object response_format. Raises ValueError if no object can be recovered."""
+    t = text.strip()
+    if t.startswith("```"):
+        nl = t.find("\n")
+        t = (t[nl + 1:] if nl != -1 else t[3:])
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+        t = t.strip()
+    try:
+        return json.loads(t)
+    except ValueError:
+        i, j = t.find("{"), t.rfind("}")
+        if 0 <= i < j:
+            return json.loads(t[i:j + 1])  # outermost { … } as a last resort
+        raise
+
+
 class OpenAIRunner:
     """Runs a station against any OpenAI-compatible chat-completions endpoint.
 
@@ -288,7 +312,7 @@ class OpenAIRunner:
     """
 
     def __init__(self, base_url: str, api_key: str | None = None, *, model: str = "auto",
-                 system: str = SYSTEM, max_tokens: int = 8192,
+                 system: str = SYSTEM, max_tokens: int = 8192, json_mode: bool = False,
                  extra_headers: dict | None = None, timeout: float = 120.0):
         self.base_url = base_url
         self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
@@ -296,19 +320,26 @@ class OpenAIRunner:
         self._system = system
         self._max_tokens = max_tokens
         self._extra_headers = dict(extra_headers or {})
+        self._json_mode = json_mode
         self.timeout = timeout
 
     def run(self, station: Station, prompt: str, schema: dict | None = None) -> dict:
+        # For a structured station, ASK for JSON in the prompt rather than relying on
+        # `response_format`: many gateway-routed providers reject the OpenAI json_object
+        # param (Anthropic via a gateway returns a 400), so a prompt instruction is the
+        # portable path. Opt into strict json_object with `json_mode=True` when the
+        # endpoint supports it (e.g. OpenAI proper).
+        user = prompt + _JSON_ONLY if (schema is not None and not self._json_mode) else prompt
         body: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self._max_tokens,
             "temperature": 0,
             "messages": [
                 {"role": "system", "content": self._system},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": user},
             ],
         }
-        if schema is not None:
+        if schema is not None and self._json_mode:
             body["response_format"] = {"type": "json_object"}
         payload, _served = openai_chat(self.base_url, self._api_key, body, self.timeout,
                                        self._extra_headers)
@@ -319,15 +350,15 @@ class OpenAIRunner:
         if schema is None:
             return {"text": text}
         try:
-            data = json.loads(text)
+            data = extract_json_object(text)
         except ValueError as exc:
             raise RuntimeError(
                 f"{station.id} returned unparseable JSON (first 200 chars: {text[:200]!r})") from exc
         # A station result must be a JSON OBJECT. A smaller/gateway-routed model sometimes
-        # returns a bare string or list under json_object mode; guard it here so the
-        # downstream station gets a clear error instead of an opaque "'str' has no .get".
+        # returns a bare string or list; guard it so the downstream station gets a clear
+        # error instead of an opaque "'str' has no .get".
         if not isinstance(data, dict):
             raise RuntimeError(
                 f"{station.id} returned a non-object JSON ({type(data).__name__}); the routed "
-                f"model did not honour json_object mode (first 200 chars: {text[:200]!r})")
+                f"model did not return an object (first 200 chars: {text[:200]!r})")
         return data

@@ -1361,7 +1361,30 @@ def test_openai_runner_parses_structured_json(monkeypatch):
     assert data["approach"] == "a"
     assert seen["base_url"] == "https://gw.example/v1"
     assert seen["headers"]["X-Muchty-Concept"] == "code.repair"   # routing rides on headers
+    # Default: NO response_format (gateway-routed Anthropic 400s on it) — JSON is asked
+    # for in the prompt instead.
+    assert "response_format" not in seen["body"]
+    assert "JSON object" in seen["body"]["messages"][-1]["content"]
+
+
+def test_openai_runner_json_mode_sends_response_format(monkeypatch):
+    from fastpdlc import runners
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
+    seen = {}
+    def fake(base_url, api_key, body, timeout=120.0, extra_headers=None):
+        seen["body"] = body
+        return _oai_msg('{"approach":"a","files":[],"criteria_to_tests":[]}')
+    monkeypatch.setattr(runners, "openai_chat", fake)
+    r = runners.OpenAIRunner("https://gw/v1", api_key="k", json_mode=True)   # opt in
+    r.run(BY_ID["ST-03"], "design", DESIGN_SCHEMA)
     assert seen["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_extract_json_object_tolerates_fences_and_prose():
+    from fastpdlc.runners import extract_json_object
+    assert extract_json_object('```json\n{"a": 1}\n```') == {"a": 1}
+    assert extract_json_object('Sure! {"a": 1} done.') == {"a": 1}
+    assert extract_json_object('{"a": 1}') == {"a": 1}
 
 
 def test_openai_runner_text_when_no_schema(monkeypatch):
