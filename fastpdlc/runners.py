@@ -252,16 +252,29 @@ def dataclasses_asdict(obj) -> dict:
 def openai_chat(base_url: str, api_key: str, body: dict, timeout: float = 120.0,
                 extra_headers: dict | None = None) -> tuple[dict, str | None]:
     """POST one OpenAI chat-completions request. Returns ``(payload, served_model)`` —
-    the served model is read from a gateway header when present (``x-muchty-model``)."""
+    the served model is read from a gateway header when present (``x-muchty-model``).
+
+    On an HTTP error the gateway's response *body* is surfaced in the raised message: a
+    bare ``502 Bad Gateway`` is useless for debugging a routing gateway, whereas the body
+    usually names the real cause (an upstream/BYOK failure, a too-large ``max_tokens``, an
+    unsupported param). Truncated so a runaway body can't flood a log."""
+    import urllib.error
     import urllib.request
     url = base_url.rstrip("/") + "/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     if extra_headers:
         headers.update({k: v for k, v in extra_headers.items() if v})
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        served = resp.headers.get("x-muchty-model") or resp.headers.get("x-model")
-        return json.loads(resp.read().decode()), served
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            served = resp.headers.get("x-muchty-model") or resp.headers.get("x-model")
+            return json.loads(resp.read().decode()), served
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", "replace")[:600]
+        except Exception:
+            detail = exc.reason or ""
+        raise RuntimeError(f"gateway {exc.code} from {url}: {detail}") from exc
 
 
 class OpenAIRunner:
@@ -275,7 +288,7 @@ class OpenAIRunner:
     """
 
     def __init__(self, base_url: str, api_key: str | None = None, *, model: str = "auto",
-                 system: str = SYSTEM, max_tokens: int = 16000,
+                 system: str = SYSTEM, max_tokens: int = 8192,
                  extra_headers: dict | None = None, timeout: float = 120.0):
         self.base_url = base_url
         self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
@@ -306,6 +319,15 @@ class OpenAIRunner:
         if schema is None:
             return {"text": text}
         try:
-            return json.loads(text)
+            data = json.loads(text)
         except ValueError as exc:
-            raise RuntimeError(f"{station.id} returned unparseable JSON") from exc
+            raise RuntimeError(
+                f"{station.id} returned unparseable JSON (first 200 chars: {text[:200]!r})") from exc
+        # A station result must be a JSON OBJECT. A smaller/gateway-routed model sometimes
+        # returns a bare string or list under json_object mode; guard it here so the
+        # downstream station gets a clear error instead of an opaque "'str' has no .get".
+        if not isinstance(data, dict):
+            raise RuntimeError(
+                f"{station.id} returned a non-object JSON ({type(data).__name__}); the routed "
+                f"model did not honour json_object mode (first 200 chars: {text[:200]!r})")
+        return data

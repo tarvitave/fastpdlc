@@ -307,7 +307,7 @@ class OpenAICodingRunner(CodingRunner):
         messages: list[dict] = [{"role": "system", "content": SYSTEM},
                                 {"role": "user", "content": prompt}]
         for _turn in range(self.max_turns):
-            body = {"model": self.model, "max_tokens": 16000, "temperature": 0,
+            body = {"model": self.model, "max_tokens": 8192, "temperature": 0,
                     "tools": OPENAI_TOOLS, "tool_choice": "auto", "messages": messages}
             payload, _ = openai_chat(self.base_url, self._api_key, body, self._timeout, self._extra_headers)
             msg = payload["choices"][0]["message"]
@@ -334,7 +334,7 @@ class OpenAICodingRunner(CodingRunner):
         # Converged — one more call, no tools, for the structured result.
         messages.append({"role": "user",
                          "content": "Return the final structured result for this change now, as JSON."})
-        body = {"model": self.model, "max_tokens": 8000, "temperature": 0,
+        body = {"model": self.model, "max_tokens": 4096, "temperature": 0,
                 "response_format": {"type": "json_object"}, "messages": messages}
         payload, _ = openai_chat(self.base_url, self._api_key, body, self._timeout, self._extra_headers)
         text = payload["choices"][0]["message"].get("content") or ""
