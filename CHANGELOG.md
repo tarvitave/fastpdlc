@@ -12,6 +12,16 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.6.3] — 2026-09-02
+
+### Fixed
+
+- **`OpenAIRunner`/`OpenAICodingRunner` no longer send `temperature` by default.** The Claude 5
+  family rejects it as a deprecated param with a 400 (`\`temperature\` is deprecated for this
+  model`), which sank a gateway-routed build at station one; it also isn't needed for structured
+  stations. Pass `temperature=<n>` explicitly to opt back in for a model/endpoint that still wants
+  it. (Found via a live gateway build once the router surfaced the upstream reason.)
+
 ## [0.6.2] — 2026-09-02
 
 ### Fixed
