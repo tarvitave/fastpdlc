@@ -12,6 +12,26 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.4.2] — 2026-09-02
+
+### Fixed
+
+- **A model that rejects `effort` no longer sinks the run either.** 0.4.1 handled the
+  `thinking` param; the very next live run showed the Haiku `Understand` station also
+  rejects the `output_config.effort` knob (`400 - This model does not support the
+  effort parameter`). `create_message` now strips *whichever* uniformly-sent param a
+  400 names — `thinking` (top level) or `effort` (inside `output_config`, preserving
+  the rest, e.g. the json-schema `format`) — and retries, bounded. Any error that
+  isn't a droppable-param 400 still propagates unchanged.
+
+### Changed
+
+- `create_message(client, base_kwargs, thinking=None)` now returns just the response
+  (was `(response, thinking_accepted)`) and is **stateless** — each call degrades
+  independently, so an Opus station still gets full thinking/effort even after a Haiku
+  station in the same run degraded. The per-runner `_thinking_supported` flag is gone.
+  New helper `runners._strip_unsupported`.
+
 ## [0.4.1] — 2026-09-02
 
 ### Fixed

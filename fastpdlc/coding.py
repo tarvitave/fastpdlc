@@ -158,7 +158,6 @@ class CodingRunner:
         # "resolve from FASTPDLC_THINKING"; an explicit value (incl. None) wins.
         from .runners import _UNSET, ClaudeRunner, resolve_thinking
         self._thinking = resolve_thinking(_UNSET if thinking is None else thinking)
-        self._thinking_supported = True
         # Non-Develop stations do not need tools; delegate them (same thinking arg).
         self.fallback = fallback or ClaudeRunner(
             api_key=self._api_key, thinking=(_UNSET if thinking is None else thinking))
@@ -209,10 +208,7 @@ class CodingRunner:
                 "tools": TOOLS,
                 "messages": messages,
             }
-            thinking = self._thinking if self._thinking_supported else None
-            response, accepted = create_message(client, base_kwargs, thinking)
-            if thinking is not None and not accepted:
-                self._thinking_supported = False
+            response = create_message(client, base_kwargs, self._thinking)
             if getattr(response, "stop_reason", None) == "refusal":
                 raise RuntimeError(f"{station.id} refused by safety classifier")
 

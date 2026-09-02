@@ -55,23 +55,52 @@ def resolve_thinking(explicit: Any = _UNSET) -> dict | None:
     return {"type": "adaptive"}
 
 
-def create_message(client: Any, base_kwargs: dict, thinking: dict | None) -> tuple[Any, bool]:
-    """``messages.create`` that degrades gracefully when a model rejects ``thinking``.
+def _strip_unsupported(kwargs: dict, message: str) -> bool:
+    """Remove the one param a model-unsupported 400 names from ``kwargs``, in place.
 
-    A station running a model without extended-thinking support (e.g. the Haiku
-    ``Understand`` station) would otherwise 400 and sink the whole run at step one.
-    When ``thinking`` is set and the API rejects *specifically* the thinking param,
-    retry the same call once without it. Returns ``(response, thinking_was_accepted)``
-    so the caller can stop sending it on later calls in the same process.
+    The roster sends a couple of params uniformly that not every model accepts —
+    ``thinking`` (top level) and an ``effort`` knob inside ``output_config`` — and a
+    model that lacks one 400s with a message naming it ("...does not support the
+    effort parameter", "adaptive thinking is not supported..."). Returns True if it
+    stripped something (so the caller should retry), False if the error is about
+    something we can't fix by dropping a param (so the caller should re-raise).
     """
+    msg = message.lower()
+    if "thinking" in msg and "thinking" in kwargs:
+        del kwargs["thinking"]
+        return True
+    if "effort" in msg and isinstance(kwargs.get("output_config"), dict) \
+            and "effort" in kwargs["output_config"]:
+        # Drop only `effort`; keep the rest of output_config (e.g. the json_schema format).
+        oc = dict(kwargs["output_config"])
+        oc.pop("effort")
+        kwargs["output_config"] = oc
+        return True
+    return False
+
+
+def create_message(client: Any, base_kwargs: dict, thinking: dict | None = None) -> Any:
+    """``messages.create`` that strips a model-unsupported param and retries.
+
+    A station on a model that rejects a uniformly-sent param (e.g. the Haiku
+    ``Understand`` station rejects both ``thinking`` and ``effort``) would otherwise
+    400 and sink the whole run at step one. On such a 400 we strip the named param
+    and retry — bounded, and only for params we know how to drop; any other error
+    propagates unchanged. Stateless: each call degrades independently, so an
+    Opus station still gets full thinking even after a Haiku station degraded.
+    """
+    kwargs = dict(base_kwargs)
     if thinking is not None:
+        kwargs["thinking"] = thinking
+    last_exc: Exception | None = None
+    for _ in range(3):   # at most: strip thinking, then strip effort, then succeed
         try:
-            return client.messages.create(thinking=thinking, **base_kwargs), True
-        except Exception as exc:
-            if "thinking" not in str(exc).lower():
+            return client.messages.create(**kwargs)
+        except Exception as exc:  # narrowed by message below; the SDK type is optional
+            last_exc = exc
+            if not _strip_unsupported(kwargs, str(exc)):
                 raise
-            # Model doesn't support this thinking mode — fall through and omit it.
-    return client.messages.create(**base_kwargs), False
+    raise last_exc  # exhausted the strip budget; surface the last real error
 
 
 class ClaudeRunner:
@@ -89,7 +118,6 @@ class ClaudeRunner:
         self._max_tokens = max_tokens
         self._system = system
         self._thinking = resolve_thinking(thinking)
-        self._thinking_supported = True   # flipped off once a model 400s on it
         self._client: Any = None
 
     def _get_client(self) -> Any:
@@ -121,10 +149,7 @@ class ClaudeRunner:
             "output_config": output_config,
             "messages": [{"role": "user", "content": prompt}],
         }
-        thinking = self._thinking if self._thinking_supported else None
-        response, accepted = create_message(client, base_kwargs, thinking)
-        if thinking is not None and not accepted:
-            self._thinking_supported = False  # this model rejects it; skip it hereafter
+        response = create_message(client, base_kwargs, self._thinking)
 
         if getattr(response, "stop_reason", None) == "refusal":
             raise RuntimeError(f"{station.id} refused by safety classifier")

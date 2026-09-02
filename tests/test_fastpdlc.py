@@ -1202,28 +1202,31 @@ def test_the_cleaner_needs_tools_like_develop(tmp_path):
     assert "ST-04b" not in rec.seen               # Clean is NOT delegated
 
 
-# ── thinking config: resolution + graceful degrade on models without it ──────
-# A station on a model that doesn't support extended thinking (e.g. the Haiku
-# `Understand` station, ST-01) used to 400 on a hard-wired thinking={"type":
-# "adaptive"} and sink the whole run at step one. These pin the fix. (Uses
-# uniquely-named fakes so as not to clobber the scripted _FakeClient above.)
+# ── thinking/effort config: resolution + graceful degrade on models without it ──
+# The Haiku `Understand` station (ST-01) rejects BOTH params the roster sends
+# uniformly — thinking={"type":"adaptive"} and output_config.effort — each with a
+# 400 that names the param, and either one used to sink the whole run at step one.
+# These pin the strip-and-retry fix. (Uniquely-named fakes so as not to clobber the
+# scripted _FakeClient above.)
 
-class _ThinkMessages:
-    """A messages stub that 400s specifically when a `thinking` param is sent."""
-    def __init__(self, resp, reject_thinking=True, other_error=None):
-        self.resp, self._reject, self._other = resp, reject_thinking, other_error
+class _PickyMessages:
+    """A messages stub that 400s when a named param is present (Haiku-like)."""
+    def __init__(self, resp, reject=("thinking", "effort"), other_error=None):
+        self.resp, self._reject, self._other = resp, set(reject), other_error
         self.calls = []
 
     def create(self, **kw):
         self.calls.append(kw)
         if self._other is not None and self._other in kw.get("model", ""):
             raise Exception("400 - invalid model")
-        if self._reject and "thinking" in kw:
+        if "thinking" in self._reject and "thinking" in kw:
             raise Exception("Error code: 400 - adaptive thinking is not supported on this model")
+        if "effort" in self._reject and "effort" in (kw.get("output_config") or {}):
+            raise Exception("400 - This model does not support the effort parameter.")
         return self.resp
 
 
-class _ThinkClient:
+class _PickyClient:
     def __init__(self, messages):
         self.messages = messages
 
@@ -1242,41 +1245,63 @@ def test_resolve_thinking_precedence(monkeypatch):
 
 def test_create_message_degrades_when_model_rejects_thinking():
     from fastpdlc.runners import create_message
-    msgs = _ThinkMessages("OK", reject_thinking=True)
-    resp, accepted = create_message(_ThinkClient(msgs),
-                                    {"model": "claude-haiku-4-5", "messages": []},
-                                    {"type": "adaptive"})
-    assert resp == "OK" and accepted is False        # retried without thinking, succeeded
-    assert len(msgs.calls) == 2                       # once with, once without
+    msgs = _PickyMessages("OK", reject=("thinking",))
+    resp = create_message(_PickyClient(msgs), {"model": "claude-haiku-4-5", "messages": []},
+                          {"type": "adaptive"})
+    assert resp == "OK"
+    assert len(msgs.calls) == 2                       # once with thinking, once without
     assert "thinking" not in msgs.calls[1]
 
 
-def test_create_message_propagates_non_thinking_errors():
+def test_create_message_degrades_when_model_rejects_effort():
+    # `effort` lives inside output_config; stripping it must keep the rest (the schema).
     from fastpdlc.runners import create_message
-    msgs = _ThinkMessages("OK", reject_thinking=False, other_error="boom")
+    msgs = _PickyMessages("OK", reject=("effort",))
+    oc = {"effort": "high", "format": {"type": "json_schema", "schema": {"x": 1}}}
+    resp = create_message(_PickyClient(msgs),
+                          {"model": "claude-haiku-4-5", "output_config": oc, "messages": []}, None)
+    assert resp == "OK"
+    assert len(msgs.calls) == 2
+    assert "effort" not in msgs.calls[1]["output_config"]
+    assert msgs.calls[1]["output_config"]["format"]["schema"] == {"x": 1}   # schema preserved
+
+
+def test_create_message_strips_both_thinking_and_effort():
+    from fastpdlc.runners import create_message
+    msgs = _PickyMessages("OK", reject=("thinking", "effort"))
+    oc = {"effort": "high", "format": {"type": "json_schema", "schema": {}}}
+    resp = create_message(_PickyClient(msgs),
+                          {"model": "claude-haiku-4-5", "output_config": oc, "messages": []},
+                          {"type": "adaptive"})
+    assert resp == "OK"
+    assert len(msgs.calls) == 3                        # thinking, then effort, then clean
+    assert "thinking" not in msgs.calls[2] and "effort" not in msgs.calls[2]["output_config"]
+
+
+def test_create_message_propagates_unfixable_errors():
+    from fastpdlc.runners import create_message
+    msgs = _PickyMessages("OK", reject=(), other_error="boom")
     with pytest.raises(Exception, match="invalid model"):
-        create_message(_ThinkClient(msgs), {"model": "boom", "messages": []}, {"type": "adaptive"})
+        create_message(_PickyClient(msgs), {"model": "boom", "messages": []}, {"type": "adaptive"})
 
 
-def test_create_message_omits_param_when_thinking_none():
+def test_create_message_omits_thinking_when_none():
     from fastpdlc.runners import create_message
-    msgs = _ThinkMessages("OK", reject_thinking=True)   # would raise IF thinking were sent
-    resp, accepted = create_message(_ThinkClient(msgs), {"model": "x", "messages": []}, None)
-    assert resp == "OK" and accepted is False and len(msgs.calls) == 1
+    msgs = _PickyMessages("OK", reject=("thinking",))   # would raise IF thinking were sent
+    resp = create_message(_PickyClient(msgs), {"model": "x", "messages": []}, None)
+    assert resp == "OK" and len(msgs.calls) == 1
     assert "thinking" not in msgs.calls[0]
 
 
-def test_claude_runner_stops_sending_thinking_after_a_rejection():
-    # End-to-end: the first call downgrades, and the per-runner flag makes the
-    # second call never even attempt thinking again.
+def test_claude_runner_survives_a_haiku_station_end_to_end():
+    # ST-01 runs on Haiku, which rejects both params. The station must still return.
     from fastpdlc.orchestration import BY_ID
     from fastpdlc.runners import ClaudeRunner
 
     runner = ClaudeRunner(api_key="test")
-    runner._client = _ThinkClient(_ThinkMessages(_Resp([_Block("hi")]), reject_thinking=True))
-    runner.run(BY_ID["ST-01"], "understand")        # haiku station -> rejects thinking
-    runner.run(BY_ID["ST-01"], "understand again")
+    runner._client = _PickyClient(_PickyMessages(_Resp([_Block("hi")]), reject=("thinking", "effort")))
+    out = runner.run(BY_ID["ST-01"], "understand")   # haiku station
+    assert out == {"text": "hi"}
     calls = runner._client.messages.calls
-    assert len(calls) == 3                          # try+retry, then one clean call
-    assert "thinking" in calls[0]
-    assert "thinking" not in calls[1] and "thinking" not in calls[2]
+    assert "thinking" not in calls[-1]                # last (successful) call sent neither
+    assert "effort" not in (calls[-1].get("output_config") or {})
