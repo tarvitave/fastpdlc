@@ -1408,3 +1408,30 @@ def test_openai_coding_runner_delegates_non_develop(monkeypatch, tmp_path):
                         lambda *a, **k: _oai_msg('{"approach":"b","files":[],"criteria_to_tests":[]}'))
     runner = OpenAICodingRunner(root=tmp_path, base_url="https://gw/v1", api_key="k")
     assert runner.run(BY_ID["ST-03"], "design", DESIGN_SCHEMA)["approach"] == "b"
+
+
+def test_openai_runner_guards_non_object_json(monkeypatch):
+    # A gateway-routed small model can return a bare JSON string under json_object mode;
+    # the runner must raise a CLEAR error, not let a str crash a downstream .get().
+    from fastpdlc import runners
+    from fastpdlc.orchestration import BY_ID, DESIGN_SCHEMA
+    monkeypatch.setattr(runners, "openai_chat", lambda *a, **k: _oai_msg('"just a string"'))
+    r = runners.OpenAIRunner("https://gw/v1", api_key="k")
+    import pytest as _pytest
+    with _pytest.raises(RuntimeError, match="non-object JSON"):
+        r.run(BY_ID["ST-03"], "design", DESIGN_SCHEMA)
+
+
+def test_openai_chat_surfaces_http_error_body(monkeypatch):
+    # A bare 502 is useless; the gateway's body must appear in the error.
+    import io
+    import urllib.error
+
+    from fastpdlc import runners
+    def boom(req, timeout=0):
+        raise urllib.error.HTTPError(req.full_url, 502, "Bad Gateway", {},
+                                     io.BytesIO(b'{"error":"upstream anthropic key invalid"}'))
+    monkeypatch.setattr("urllib.request.urlopen", boom)
+    import pytest as _pytest
+    with _pytest.raises(RuntimeError, match="upstream anthropic key invalid"):
+        runners.openai_chat("https://gw/v1", "k", {"messages": []})

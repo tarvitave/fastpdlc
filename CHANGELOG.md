@@ -12,6 +12,20 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.6.1] — 2026-09-02
+
+### Fixed
+
+- **Gateway failures are now diagnosable.** `openai_chat` surfaces the HTTP error *body* in the
+  raised message — a bare `502 Bad Gateway` from a router is useless, whereas the body usually
+  names the real cause (an upstream/BYOK failure, a too-large `max_tokens`, an unsupported param).
+- **`OpenAIRunner` guards non-object JSON.** A smaller/gateway-routed model can return a bare JSON
+  string or list under `json_object` mode; the runner now raises a clear error (naming the type and
+  the first chars) instead of letting a `str` crash a downstream `.get()`.
+- **Safer default `max_tokens` for gateway use:** `OpenAIRunner` defaults to 8192 (was 16000) and
+  `OpenAICodingRunner`'s loop uses 8192/4096, since many gateway-routed models cap output well below
+  16000 and reject the larger request. (The native Anthropic runners are unchanged.)
+
 ## [0.6.0] — 2026-09-02
 
 ### Added
