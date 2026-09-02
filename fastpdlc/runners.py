@@ -240,3 +240,72 @@ class CrossProviderLens:
 def dataclasses_asdict(obj) -> dict:
     import dataclasses
     return dataclasses.asdict(obj)
+
+
+# ── OpenAI-compatible runner: the config bridge to any chat-completions gateway ──
+# fastpdlc's native runners speak the Anthropic Messages API. This one speaks the
+# OpenAI ``/chat/completions`` shape, so the pipeline can be pointed — by ``base_url`` —
+# at ANY OpenAI-compatible endpoint: a routing gateway (e.g. Muchty), OpenRouter, a
+# local vLLM/Ollama, or OpenAI itself. That is what turns "no config bridge" into a
+# base_url. stdlib-only, matching CrossProviderLens — no SDK dependency.
+
+def openai_chat(base_url: str, api_key: str, body: dict, timeout: float = 120.0,
+                extra_headers: dict | None = None) -> tuple[dict, str | None]:
+    """POST one OpenAI chat-completions request. Returns ``(payload, served_model)`` —
+    the served model is read from a gateway header when present (``x-muchty-model``)."""
+    import urllib.request
+    url = base_url.rstrip("/") + "/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    if extra_headers:
+        headers.update({k: v for k, v in extra_headers.items() if v})
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        served = resp.headers.get("x-muchty-model") or resp.headers.get("x-model")
+        return json.loads(resp.read().decode()), served
+
+
+class OpenAIRunner:
+    """Runs a station against any OpenAI-compatible chat-completions endpoint.
+
+    Same ``run(station, prompt, schema)`` contract as ClaudeRunner, so it drops into the
+    Orchestrator unchanged — but the reasoning runs through whatever ``base_url`` points
+    at. Gateway routing/metadata (a concept header, a project tag) rides on
+    ``extra_headers``. Structured stations get ``response_format=json_object``; the
+    result is parsed from the message content.
+    """
+
+    def __init__(self, base_url: str, api_key: str | None = None, *, model: str = "auto",
+                 system: str = SYSTEM, max_tokens: int = 16000,
+                 extra_headers: dict | None = None, timeout: float = 120.0):
+        self.base_url = base_url
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self.model = model
+        self._system = system
+        self._max_tokens = max_tokens
+        self._extra_headers = dict(extra_headers or {})
+        self.timeout = timeout
+
+    def run(self, station: Station, prompt: str, schema: dict | None = None) -> dict:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self._max_tokens,
+            "temperature": 0,
+            "messages": [
+                {"role": "system", "content": self._system},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if schema is not None:
+            body["response_format"] = {"type": "json_object"}
+        payload, _served = openai_chat(self.base_url, self._api_key, body, self.timeout,
+                                       self._extra_headers)
+        try:
+            text = payload["choices"][0]["message"].get("content") or ""
+        except (KeyError, IndexError) as exc:
+            raise RuntimeError(f"{station.id}: malformed response from {self.base_url}") from exc
+        if schema is None:
+            return {"text": text}
+        try:
+            return json.loads(text)
+        except ValueError as exc:
+            raise RuntimeError(f"{station.id} returned unparseable JSON") from exc
