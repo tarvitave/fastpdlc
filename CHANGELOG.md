@@ -12,6 +12,20 @@ config key, or the plugin `Registry` surface is a breaking change and bumps the 
 
 Nothing yet.
 
+## [0.5.0] — 2026-09-02
+
+### Added
+
+- **`Orchestrator.run(feature, block_on_unresolved=True)` — an advisory human gate for
+  autonomous runs.** The Disambiguate station is deliberately adversarial (it will keep
+  finding underspecified axes; a more complete brief tends to yield *more* questions, not
+  fewer), and the default gate blocks the line before Design on any unresolved question —
+  the right behaviour when a human is in the loop. Passing `block_on_unresolved=False`
+  keeps recording those questions on `report.disambiguation` but lets the line **build on
+  the versioned product intent**, moving the human judgement to the concrete PR (its gates
+  and the merge) instead of a set of abstract pre-build questions. The default is unchanged,
+  so existing callers still get the blocking gate.
+
 ## [0.4.2] — 2026-09-02
 
 ### Fixed
