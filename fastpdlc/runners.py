@@ -67,7 +67,7 @@ def create_message(client: Any, base_kwargs: dict, thinking: dict | None) -> tup
     if thinking is not None:
         try:
             return client.messages.create(thinking=thinking, **base_kwargs), True
-        except Exception as exc:  # noqa: BLE001 — the SDK type is optional; narrow by message
+        except Exception as exc:
             if "thinking" not in str(exc).lower():
                 raise
             # Model doesn't support this thinking mode — fall through and omit it.
@@ -114,13 +114,13 @@ class ClaudeRunner:
         if schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": schema}
 
-        base_kwargs = dict(
-            model=station.model or "claude-opus-5",
-            max_tokens=self._max_tokens,
-            system=self._system,
-            output_config=output_config,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        base_kwargs = {
+            "model": station.model or "claude-opus-5",
+            "max_tokens": self._max_tokens,
+            "system": self._system,
+            "output_config": output_config,
+            "messages": [{"role": "user", "content": prompt}],
+        }
         thinking = self._thinking if self._thinking_supported else None
         response, accepted = create_message(client, base_kwargs, thinking)
         if thinking is not None and not accepted:

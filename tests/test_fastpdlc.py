@@ -1269,8 +1269,8 @@ def test_create_message_omits_param_when_thinking_none():
 def test_claude_runner_stops_sending_thinking_after_a_rejection():
     # End-to-end: the first call downgrades, and the per-runner flag makes the
     # second call never even attempt thinking again.
-    from fastpdlc.runners import ClaudeRunner
     from fastpdlc.orchestration import BY_ID
+    from fastpdlc.runners import ClaudeRunner
 
     runner = ClaudeRunner(api_key="test")
     runner._client = _ThinkClient(_ThinkMessages(_Resp([_Block("hi")]), reject_thinking=True))

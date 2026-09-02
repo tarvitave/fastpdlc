@@ -156,7 +156,7 @@ class CodingRunner:
         # Same thinking resolution + graceful-degrade path as ClaudeRunner, so a
         # non-thinking model here won't sink the tool loop either. `_UNSET` means
         # "resolve from FASTPDLC_THINKING"; an explicit value (incl. None) wins.
-        from .runners import ClaudeRunner, resolve_thinking, _UNSET
+        from .runners import _UNSET, ClaudeRunner, resolve_thinking
         self._thinking = resolve_thinking(_UNSET if thinking is None else thinking)
         self._thinking_supported = True
         # Non-Develop stations do not need tools; delegate them (same thinking arg).
@@ -201,14 +201,14 @@ class CodingRunner:
 
         from .runners import create_message
         for _turn in range(self.max_turns):
-            base_kwargs = dict(
-                model=self.model,
-                max_tokens=16000,
-                system=SYSTEM,
-                output_config={"effort": station.effort or "high"},
-                tools=TOOLS,
-                messages=messages,
-            )
+            base_kwargs = {
+                "model": self.model,
+                "max_tokens": 16000,
+                "system": SYSTEM,
+                "output_config": {"effort": station.effort or "high"},
+                "tools": TOOLS,
+                "messages": messages,
+            }
             thinking = self._thinking if self._thinking_supported else None
             response, accepted = create_message(client, base_kwargs, thinking)
             if thinking is not None and not accepted:
